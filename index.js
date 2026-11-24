@@ -2,41 +2,19 @@ require('dotenv').config();
 const config = require('./config');
 const log = require('./logger');
 const { Client, RichEmbed } = require('discord.js');
-const discordClient = new Client();
-const fs = require('fs');
-const path = require('path');
 const schedule = require('node-schedule');
-const uuid = require('uuid/v1');
+const store = require('./store/jsonStore');
+const { getChannel } = require('./lib/channels');
+const { formatDateForRSVP } = require('./lib/time');
+const { Poll, PollSetupData, OptionEmoji } = require('./models/poll');
+const googleService = require('./services/google');
 
-//Required for Google Calendar
-const readline = require('readline');
-const { google } = require('googleapis');
-const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
-const TOKEN_PATH = 'token.json';
-let oAuth2Client = null;
-
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const discordClient = new Client();
 
 let guild = null;
 let unfinishedPollList = [];
 let openPollList = [];
 let lobbyList = [];
-
-//Look up a configured channel by name or ID
-function getChannel(key) {
-	const nameOrId = config.channels[key];
-
-	return guild.channels.find(ch => ch.name === nameOrId || ch.id === nameOrId);
-}
-
-const EVENT_IMAGE_KEYS = {
-	'main munch': 'mainMunch',
-	'billiards': 'billiards',
-	'billiards discussion': 'billiardsDiscussion',
-	'wlgbt brunch': 'wlgbtBrunch',
-	'wlgbt evening': 'wlgbtEvening',
-	'crafts': 'crafts'
-};
 
 const EVENT_TAG_FORMAT_HELP = [
 	'Add these tags to the calendar event description:',
@@ -44,144 +22,23 @@ const EVENT_TAG_FORMAT_HELP = [
 	'[url:<rsvp url>] — link shown in the RSVP field'
 ].join('\n');
 
-const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
-
-const folderRoot = (process.env.DEV == "true" ?
-	path.join(dataDir, 'dev') :
-	dataDir);
-
-// Ensure the state directory exists before any read or write.
-fs.mkdirSync(folderRoot, { recursive: true });
-
 log.info('Starting Kodama', {
 	dev: process.env.DEV === 'true',
-	dataDirectory: folderRoot
+	dataDirectory: store.folderRoot
 });
 
 discordClient.login(process.env.BOT_TOKEN);
 
-//=========================================
-class RsvpData {
-	constructor(going = [], maybeGoing = [], notGoing = []) {
-		this.going = going;
-		this.maybeGoing = maybeGoing;
-		this.notGoing = notGoing;
-	}
-
-	toString() {
-		return "====Going====\n" +
-			this.going.join("\n") + "\n\n" +
-			"====Maybe Going====\n" +
-			this.maybeGoing.join("\n") + "\n\n" +
-			"====Not Going====\n" +
-			this.notGoing.join("\n");
-	}
-};
-
-class Poll {
-	constructor(memberId, setupData = new PollSetupData(null, null), channelId = null, title = null, description = null, expirationDate = null, optionsAreMutuallyExclusive = null, options = []) {
-		this.id = uuid();
-		this.messageId = null;
-		this.memberId = memberId;
-		this.setupData = setupData;
-		this.channelId = channelId;
-		this.title = title;
-		this.description = description;
-		this.expirationDate = expirationDate;
-		this.optionsAreMutuallyExclusive = optionsAreMutuallyExclusive;
-		this.options = options;
-	}
-
-	addOption(title, emoji = null) {
-		this.options.push(new PollOption(title, emoji));
-	}
-
-	getDescriptionForEmbed(status = 'unfinished') {
-		let returnText = '';
-
-		const member = guild.members.find(m => m.id == this.memberId);
-
-		if (status == 'finished') {
-			returnText += `By ${member}\n`;
-			returnText += `Closes on ${formatDateTime(new Date(this.expirationDate))}\n\n`;
-			returnText += `${this.description}\n\n`;
-
-			this.options.forEach((option) => {
-				const emoji = (option.emoji.id ? guild.emojis.get(option.emoji.id) : option.emoji.name);
-
-				returnText += `${emoji}: \`${option.title}\`\n\n`;
-			});
-		}
-		else if (status == 'unfinished') {
-			returnText += `By: ${member}\n\n`;
-
-			returnText += `Title: ${(this.title ? this.title : '')}\n`;
-			returnText += `Description: ${(this.description ? this.description : '')}\n`;
-			returnText += `Closes on: ${(this.expirationDate ? formatDateTime(new Date(this.expirationDate)) : '')}\n`;
-			returnText += `Options mutually exclusive: ${(this.optionsAreMutuallyExclusive == null ? '' : (this.optionsAreMutuallyExclusive ? 'Yes' : 'No'))}\n`;
-			returnText += 'Options:\n';
-
-			if (this.options) {
-				this.options.forEach((option) => {
-					let emoji = '[None]';
-
-					if (option.emoji) {
-						emoji = (option.emoji.id ? guild.emojis.get(option.emoji.id) : option.emoji.name);
-					}
-
-					returnText += `${emoji}: \`${option.title}\`\n`;
-				});
-			}
-
-			returnText += '\n';
-		}
-		else if (status == 'closed') {
-			returnText += `By ${member}\n`;
-			returnText += `${this.description}\n\n`;
-			returnText += '__**Final Results:**__\n';
-
-			this.options.forEach((option) => {
-
-				returnText += `\`${option.title}\`: **${option.memberIds.length}**\n\n`;
-			});
-		}
-
-		return returnText;
-	}
-}
-
-class PollOption {
-	constructor(title, emoji = null) {
-		this.title = title;
-		this.emoji = emoji;
-		this.memberIds = [];
-	}
-}
-
-class PollSetupData {
-	constructor(channelId, messageId) {
-		this.channelId = channelId;
-		this.messageId = messageId;
-	}
-}
-
-class OptionEmoji {
-	constructor(name, id = null) {
-		this.name = name;
-		this.id = id;
-	}
-}
-
 function admitMember(targetMember) {
-	const adminOnlyChannel = getChannel('adminOnly'),
+	const adminOnlyChannel = getChannel(guild, 'adminOnly'),
 		adminOnlyEmbed = new RichEmbed()
 			.setColor(0x1abc9c);
 
 	if (targetMember) {
-		const introductionsChannel = getChannel('introductions'),
-			rulesChannel = getChannel('rules'),
-			selfAssignRolesChannel = getChannel('selfAssignRoles'),
-			infoAndFaqChannel = getChannel('infoAndFaq');
+		const introductionsChannel = getChannel(guild, 'introductions'),
+			rulesChannel = getChannel(guild, 'rules'),
+			selfAssignRolesChannel = getChannel(guild, 'selfAssignRoles'),
+			infoAndFaqChannel = getChannel(guild, 'infoAndFaq');
 
 		targetMember.addRoles([config.roles.member, config.roles.dmsClosed])
 
@@ -193,7 +50,7 @@ function admitMember(targetMember) {
 
 		lobbyList = lobbyList.filter(loiterer => loiterer.id != targetMember.id);
 
-		fs.writeFileSync(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8');
+		store.saveSync('lobby', lobbyList);
 
 		adminOnlyEmbedDescription += `\n\nRemoved ${targetMember.displayName} from \"lobby.json\"`;
 
@@ -233,252 +90,6 @@ function admitMember(targetMember) {
 	}
 }
 
-function formatDateForRSVP(date) {
-	const month = MONTH_NAMES[date.getMonth()],
-		day = date.getDate(),
-		year = date.getFullYear(),
-		timeSuffix = date.getHours() > 11 ? "PM" : "AM";
-
-	let time = formatTime(date);
-
-	return month + ' ' + day + ', ' + year + " (" + time + ")";
-}
-
-function formatDateTime(startDateTime, endDateTime = null) {
-	const startDate = new Date(Date.parse(startDateTime)),
-		endDate = (endDateTime ? new Date(Date.parse(endDateTime)) : null),
-		month = MONTH_NAMES[startDate.getMonth()],
-		day = startDate.getDate(),
-		year = startDate.getFullYear(),
-		startTime = formatTime(startDate),
-		endTime = (endDate ? formatTime(endDate) : null);
-
-	return month + ' ' + day + ', ' + year + " (" + startTime + (endTime ? " to " + endTime : '') + ")";
-}
-
-function formatTime(date) {
-	let hours = (date.getHours() % 12),
-		minutes = date.getMinutes();
-
-	const timeSuffix = date.getHours() > 11 ? "PM" : "AM";
-
-	if (hours == 0) hours = 12;
-
-	if (hours < 10) {
-		hours = "0" + hours;
-	}
-
-	if (minutes < 10) {
-		minutes = "0" + minutes;
-	}
-
-	return hours + ":" + minutes + " " + timeSuffix
-}
-
-function newEventEmbed(event) {
-	//Get the Type of the event from its description
-	let startIndex = event.description.indexOf('[type:') + 6,
-		endIndex = event.description.indexOf(']', startIndex);
-	const type = event.description.substring(startIndex, endIndex);
-
-	//Get the event listing link for the event from its description
-	startIndex = event.description.indexOf('[url:') + 5;
-	endIndex = event.description.indexOf(']', startIndex);
-	let url = event.description.substring(startIndex, endIndex).trim();
-
-	if (url.startsWith('<a')) {
-		startIndex = event.description.indexOf('"', startIndex) + 1;
-		endIndex = event.description.indexOf('"', startIndex);
-		url = event.description.substring(startIndex, endIndex);
-	}
-
-	if (type && url) {
-		const embed = new RichEmbed()
-			.setColor(0x1abc9c)
-			.setURL(url);
-
-		const date = formatDateTime(event.start.dateTime, event.end.dateTime);
-
-		if (type.toLowerCase() == 'main munch') {
-			embed.setTitle('The Main Munch')
-				.setDescription('Friends, it\'s time for our largest monthly event, The Main Munch! \n\nDiscover and donate treasures at the Swap-and-Shop table.')
-				.addField('Date', date)
-				.addField('Location', 'Visit our event page to get the address!')
-				.addField('Eligible Members', 'Everyone!')
-				.addField('Cost', '$2 donation and individual checks (please be sure to support our venue and waitstaff)')
-				.addField('Dress Code', 'Something nice or dress to impress!');
-		}
-		else if (type.toLowerCase() == 'billiards') {
-			embed.setTitle('The Hidden Speakeasy Relaxed Meet')
-				.setDescription('We\'re going to be meeting at our local billiard parlor for pool, board games, and drinks!')
-				.addField('Date', date)
-				.addField('Location', 'Visit our event page to get the address!')
-				.addField('Eligible Members', 'Everyone!')
-				.addField('Cost', '$2 donation, $10 event cost')
-				.addField('Dress Code', 'Nice casual or dress to impress!');
-		}
-		else if (type.toLowerCase() == 'billiards discussion') {
-			embed.setTitle('Discussion Group')
-				.setDescription('We\'re going to be meeting at our local billiard parlor for a discussion group!')
-				.addField('Date', date)
-				.addField('Location', 'Visit our event page to get the address!')
-				.addField('Eligible Members', 'Everyone!')
-				.addField('Cost', '$5 event cost, $2 optional donation')
-				.addField('Dress Code', 'Casual or dress to impress!');
-		}
-		else if (type.toLowerCase() == 'wlgbt brunch') {
-			embed.setTitle('Women\'s and LGBT+ Sunday Brunch Munch :gay_pride_flag:')
-				.setDescription('Join us for Sunday Brunch, where we celebrate women and the LGBT+ Community, especially those who may not feel as comfortable at our regular events. :pancakes:')
-				.addField('Date', date)
-				.addField('Location', 'Visit our event page to get the address!')
-				.addField('Eligible Members', 'Women and members of the LGBT+ Community only!')
-				.addField('Cost', '$2 donation and individual checks (please be sure to support our venue and waitstaff)')
-				.addField('Dress Code', 'Casual or dress to impress!');
-		}
-		else if (type.toLowerCase() == 'wlgbt evening') {
-			embed.setTitle('Women\'s and LGBT+ Evening Munch :gay_pride_flag:')
-				.setDescription('Join us at our Evening Women\'s and LGBT+ Munch, where we celebrate women and the LGBT+ Community, especially those who may not feel as comfortable at our regular events.')
-				.addField('Date', date)
-				.addField('Location', 'Visit our event page to get the address!')
-				.addField('Eligible Members', 'Women and members of the LGBT+ Community only!')
-				.addField('Cost', '$2 donation and individual checks (please be sure to support our venue and waitstaff)')
-				.addField('Dress Code', 'Casual or dress to impress!');
-		}
-		else if (type.toLowerCase() == 'crafts') {
-			embed.setTitle('Daytime Crafts and Potluck')
-				.setDescription('Join us for a daytime arts and crafts party! :art:\n\nPlease remember to bring a potluck item to share. Extra points for homemade! *Gluten-free makes us happy!* :sparkling_heart:')
-				.addField('Date', date + '\nCome when you can--No strict start time!')
-				.addField('Location', 'Visit our event page to get the address!')
-				.addField('Eligible Members', 'Everyone!')
-				.addField('Cost', '$15')
-				.addField('Dress Code', 'Casual or dress to impress!');
-		}
-		else {
-			return null;
-		}
-
-		const imageKey = EVENT_IMAGE_KEYS[type.toLowerCase()];
-
-		if (imageKey && config.eventImages[imageKey]) {
-			embed.setImage(config.eventImages[imageKey]);
-		}
-
-		embed.addField('Don\'t forget to RSVP!', url);
-
-		return embed;
-	}
-
-	return null;
-}
-
-function setGoogleApiAuth() {
-	if (!fs.existsSync('google_credentials.json')) {
-		throw new Error(
-			'Missing google_credentials.json. Copy google_credentials.example.json and add your Google OAuth client credentials.'
-		);
-	}
-
-	const content = fs.readFileSync('google_credentials.json');
-	const credentials = JSON.parse(content);
-	const { client_secret, client_id, redirect_uris } = credentials.installed;
-	oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-
-	if (!fs.existsSync(TOKEN_PATH)) {
-		const authUrl = oAuth2Client.generateAuthUrl({
-			access_type: 'offline',
-			scope: SCOPES,
-		});
-
-		log.info('Authorize this app by visiting this URL', { url: authUrl });
-		const rl = readline.createInterface({
-			input: process.stdin,
-			output: process.stdout,
-		});
-
-		rl.question('Enter the code from that page here: ', (code) => {
-			rl.close();
-
-			oAuth2Client.getToken(code, (err, token) => {
-				if (err) return log.error('Failed to retrieve Google access token', err);
-
-				oAuth2Client.setCredentials(token);
-
-				// Store the token to disk for later program executions
-				fs.writeFile(TOKEN_PATH, JSON.stringify(token), (err) => {
-					if (err) return log.error('Failed to store Google token', { path: TOKEN_PATH }, err);
-
-					log.info('Google token stored', { path: TOKEN_PATH });
-				});
-			});
-		});
-
-		return;
-	}
-
-	const token = fs.readFileSync(TOKEN_PATH);
-
-	oAuth2Client.setCredentials(JSON.parse(token));
-}
-
-function announceNextWeeksEvents(auth) {
-	const calendar = google.calendar({ version: 'v3', auth }),
-		date = new Date();
-
-	calendar.events.list({
-		calendarId: config.google.calendarId,
-		timeMin: date.toISOString(),
-		timeMax: (new Date(date.setTime(date.getTime() + 7 * 86400000))).toISOString(),
-		singleEvents: true,
-		orderBy: 'startTime',
-		q: config.google.eventQuery
-	},
-		(err, res) => {
-			if (err) return log.error('Google Calendar API request failed', { calendarId: config.google.calendarId }, err);
-
-			const events = res.data.items;
-
-			if (events.length) {
-				const channel = getChannel('announcements');
-
-				let announcedEventList = [],
-					updateAnnouncedEventsList = false;
-
-				if (fs.existsSync(`${folderRoot}/announced events.json`)) {
-					const content = fs.readFileSync(`${folderRoot}/announced events.json`);
-
-					announcedEventList = JSON.parse(content);
-				}
-
-				events.forEach((event) => {
-					const announcedEvent = announcedEventList.find(e => e.id == event.id);
-
-					//Send embed and get its id
-
-					if (!announcedEvent) {
-						const embed = newEventEmbed(event);
-
-						if (embed) {
-							channel.send(embed)
-								.catch(err => log.error('Failed to announce event', { eventId: event.id }, err));
-
-							announcedEventList.push({ id: event.id });
-
-							updateAnnouncedEventsList = true;
-						}
-					}
-				});
-
-				if (updateAnnouncedEventsList) {
-					fs.writeFile(`${folderRoot}/announced events.json`, JSON.stringify(announcedEventList), 'utf8', (err) => {
-						if (err) {
-							log.error('Failed to write announced events', { file: 'announced events.json' }, err);
-						}
-					});
-				}
-			}
-		});
-}
-
 function addMissingSecretClubRoles() {
 	const memberRoleId = config.roles.member,
 		secretClubRoleId = config.roles.secretClub,
@@ -504,20 +115,16 @@ function scheduleMidnightJobs() {
 	const rule = new schedule.RecurrenceRule(null, null, null, null, 0, 0, 0);
 
 	const job = schedule.scheduleJob(rule, async function () {
-		if (fs.existsSync(`${folderRoot}/lobby.json`)) {
-			const content = fs.readFileSync(`${folderRoot}/lobby.json`);
-
-			lobbyList = JSON.parse(content);
+		if (store.exists('lobby')) {
+			lobbyList = store.load('lobby', []);
 
 			let updateLobbyListFile = false,
 				updateKickedListFile = false,
 				kickedMembers = '',
 				kickedList = [];
 
-			if (fs.existsSync(`${folderRoot}/kicked.json`)) {
-				const kickedContent = fs.readFileSync(`${folderRoot}/kicked.json`);
-
-				kickedList = JSON.parse(kickedContent);
+			if (store.exists('kicked')) {
+				kickedList = store.load('kicked', []);
 			}
 
 			const dmEmbed = new RichEmbed()
@@ -553,19 +160,15 @@ function scheduleMidnightJobs() {
 			});
 
 			if (updateLobbyListFile) {
-				fs.writeFile(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8', (err) => {
-					if (err) {
-						log.error('Failed to write lobby state', { file: 'lobby.json' }, err);
-					}
-				});
+				store.save('lobby', lobbyList);
 			}
 
 			if (updateKickedListFile) {
-				fs.writeFileSync(`${folderRoot}/kicked.json`, JSON.stringify(kickedList), 'utf8');
+				store.saveSync('kicked', kickedList);
 			}
 
 			if (kickedMembers != '') {
-				const adminOnlyChannel = getChannel('adminOnly'),
+				const adminOnlyChannel = getChannel(guild, 'adminOnly'),
 					embed = new RichEmbed()
 						.setTitle('The following members were kicked from the lobby!')
 						.setColor(0x1abc9c)
@@ -576,7 +179,7 @@ function scheduleMidnightJobs() {
 			}
 		}
 
-		announceNextWeeksEvents(oAuth2Client);
+		googleService.announceNextWeeksEvents(guild, googleService.getAuth());
 
 		addMissingSecretClubRoles();
 
@@ -591,7 +194,7 @@ function closePoll(poll) {
 		embed = new RichEmbed()
 			.setTitle(`Poll '${poll.title}' has closed!`)
 			.setColor(0x1abc9c)
-			.setDescription(poll.getDescriptionForEmbed('closed'));
+			.setDescription(poll.getDescriptionForEmbed(guild, 'closed'));
 
 	if (channel) {
 		channel.send(embed)
@@ -601,7 +204,7 @@ function closePoll(poll) {
 	openPollList = openPollList.filter(p => p.id != poll.id);
 
 	try {
-		fs.writeFileSync(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8');
+		store.saveSync('openPolls', openPollList);
 	}
 	catch (err) {
 		log.error('Failed to write open polls', { file: 'open polls.json' }, err);
@@ -628,7 +231,7 @@ function schedulePollClosures() {
 
 function scheduleIdleBreaker() {
 	const rule = new schedule.RecurrenceRule(null, null, null, null, null, 0, 0),
-		channel = getChannel('kodamaTest'),
+		channel = getChannel(guild, 'kodamaTest'),
 		job = schedule.scheduleJob(rule, async function () {
 			channel.startTyping();
 			log.debug('Keep-alive typing indicator started');
@@ -656,7 +259,7 @@ discordClient.on('ready', async () => {
 
 	log.info('Discord presence set', { activity: 'kod!help | The forest\'s little helper' });
 
-	await setGoogleApiAuth();
+	await googleService.setGoogleApiAuth();
 
 	log.info('Google API authentication ready');
 
@@ -664,26 +267,20 @@ discordClient.on('ready', async () => {
 
 	log.info('Scheduled midnight jobs');
 
-	if (fs.existsSync(`${folderRoot}/open polls.json`)) {
-		const content = fs.readFileSync(`${folderRoot}/open polls.json`);
-
-		openPollList = JSON.parse(content);
+	if (store.exists('openPolls')) {
+		openPollList = store.load('openPolls', []);
 
 		log.info('Loaded state', { file: 'open polls.json', count: openPollList.length });
 	}
 
-	if (fs.existsSync(`${folderRoot}/unfinished polls.json`)) {
-		const content = fs.readFileSync(`${folderRoot}/unfinished polls.json`);
-
-		unfinishedPollList = JSON.parse(content);
+	if (store.exists('unfinishedPolls')) {
+		unfinishedPollList = store.load('unfinishedPolls', []);
 
 		log.info('Loaded state', { file: 'unfinished polls.json', count: unfinishedPollList.length });
 	}
 
-	if (fs.existsSync(`${folderRoot}/lobby.json`)) {
-		const content = fs.readFileSync(`${folderRoot}/lobby.json`);
-
-		lobbyList = JSON.parse(content);
+	if (store.exists('lobby')) {
+		lobbyList = store.load('lobby', []);
 
 		log.info('Loaded state', { file: 'lobby.json', count: lobbyList.length });
 	}
@@ -700,7 +297,7 @@ discordClient.on('message', msg => {
 		contentToLowerCase = msg.content.toLowerCase();
 
 	if (msg.channel.type == 'dm' && msg.author.id != discordClient.user.id) {
-		const channel = getChannel('adminOnly'),
+		const channel = getChannel(guild, 'adminOnly'),
 			embed = new RichEmbed()
 			.setColor(0x1abc9c)
 			.setTitle(`${msg.author.username} sent Kodama a DM`);
@@ -774,13 +371,13 @@ discordClient.on('message', msg => {
 				if (poll.title == null) {
 					poll.title = (msg.content == 'none' ? '' : msg.content);
 
-					embed.setDescription(poll.getDescriptionForEmbed() + '**Next: Type out a description for your poll.**');
+					embed.setDescription(poll.getDescriptionForEmbed(guild) + '**Next: Type out a description for your poll.**');
 
 				}
 				else if (poll.description == null) {
 					poll.description = (msg.content == 'none' ? '' : msg.content);
 
-					embed.setDescription(poll.getDescriptionForEmbed() + '**Next: Type out a poll duration.**\n\n*Ex: 1 hour\nEx: 4 days*');
+					embed.setDescription(poll.getDescriptionForEmbed(guild) + '**Next: Type out a poll duration.**\n\n*Ex: 1 hour\nEx: 4 days*');
 				}
 				else if (poll.expirationDate == null) {
 					const date = new Date();
@@ -806,12 +403,12 @@ discordClient.on('message', msg => {
 					}
 
 					if (amountValid) {
-						embed.setDescription(poll.getDescriptionForEmbed() + '**Next: Should options on this poll be mutually exclusive?**\nIf "yes", users will only be able to pick one option at a time.');
+						embed.setDescription(poll.getDescriptionForEmbed(guild) + '**Next: Should options on this poll be mutually exclusive?**\nIf "yes", users will only be able to pick one option at a time.');
 					}
 					else {
 						updateUnfinishedList = false;
 
-						embed.setDescription(poll.getDescriptionForEmbed() + '**ERROR: Poll duration syntax error!\n\nNext: Type out a poll duration.**\n\n*Ex: 1 hour\nEx: 4 days*')
+						embed.setDescription(poll.getDescriptionForEmbed(guild) + '**ERROR: Poll duration syntax error!\n\nNext: Type out a poll duration.**\n\n*Ex: 1 hour\nEx: 4 days*')
 							.setColor(0xe91e63);
 					}
 				}
@@ -824,34 +421,32 @@ discordClient.on('message', msg => {
 					}
 					else {
 						updateUnfinishedList = false;
-						embed.setDescription(poll.getDescriptionForEmbed() + '**ERROR: response must be one of the following:**\nyes, y, true, t\nno, n, false, f\n\n**Next: Should options on this poll be mutually exclusive?**\nIf "yes", users will only be able to pick one option at a time.**')
+						embed.setDescription(poll.getDescriptionForEmbed(guild) + '**ERROR: response must be one of the following:**\nyes, y, true, t\nno, n, false, f\n\n**Next: Should options on this poll be mutually exclusive?**\nIf "yes", users will only be able to pick one option at a time.**')
 							.setColor(0xe91e63);;
 					}
 
 					if (poll.optionsAreMutuallyExclusive != null) {
-						embed.setDescription(poll.getDescriptionForEmbed() + '**Next: Type out a voting option for your poll.**');
+						embed.setDescription(poll.getDescriptionForEmbed(guild) + '**Next: Type out a voting option for your poll.**');
 					}
 				}
 				else if ((poll.options.length == 0 || poll.options[poll.options.length - 1].emoji != null) && contentToLowerCase != '[done]') {
 					poll.addOption(msg.content);
 
-					embed.setDescription(poll.getDescriptionForEmbed() + '**Next: React with an emoji for this option.**\n\nNote: The emoji must be a default emoji or a custom emoji from this server.');
+					embed.setDescription(poll.getDescriptionForEmbed(guild) + '**Next: React with an emoji for this option.**\n\nNote: The emoji must be a default emoji or a custom emoji from this server.');
 				}
 
 				if (poll.options.length > 1 && poll.options[poll.options.length - 1].emoji != null && contentToLowerCase == '[done]') {
 					const newPollEmbed = new RichEmbed()
 						.setColor(0x1abc9c)
 						.setTitle('Poll: ' + poll.title)
-						.setDescription(poll.getDescriptionForEmbed('finished'));
+						.setDescription(poll.getDescriptionForEmbed(guild, 'finished'));
 
 					embed.setTitle('Poll Set Up Complete!');
 
 					unfinishedPollList = unfinishedPollList.filter(p => p.memberId != member.id);
 
-					if (fs.existsSync(`${folderRoot}/open polls.json`)) {
-						const content = fs.readFileSync(`${folderRoot}/open polls.json`);
-
-						openPollList = JSON.parse(content);
+					if (store.exists('openPolls')) {
+						openPollList = store.load('openPolls', []);
 					}
 
 					const channel = guild.channels.find(ch => ch.id == poll.channelId)
@@ -867,11 +462,7 @@ discordClient.on('message', msg => {
 
 							openPollList.push(poll);
 
-							fs.writeFile(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8', (err) => {
-								if (err) {
-									log.error('Failed to write open polls', { file: 'open polls.json' }, err);
-								}
-							});
+							store.save('openPolls', openPollList);
 
 							poll.options.forEach(async (option) => {
 								const emoji = (option.emoji.id ? guild.emojis.get(option.emoji.id) : option.emoji.name);
@@ -907,7 +498,7 @@ discordClient.on('message', msg => {
 						}
 
 						embed.setColor(0xe91e63)
-							.setDescription(poll.getDescriptionForEmbed() + errorMessage);
+							.setDescription(poll.getDescriptionForEmbed(guild) + errorMessage);
 
 						updateUnfinishedList = false;
 					}
@@ -928,22 +519,14 @@ discordClient.on('message', msg => {
 								poll.setupData = new PollSetupData(newPollMessage.channel.id, newPollMessage.id);
 								unfinishedPollList[pollListIndex] = poll;
 
-								fs.writeFile(`${folderRoot}/unfinished polls.json`, JSON.stringify(unfinishedPollList), 'utf8', (err) => {
-									if (err) {
-										log.error('Failed to write unfinished polls', { file: 'unfinished polls.json' }, err);
-									}
-								});
+								store.save('unfinishedPolls', unfinishedPollList);
 							})
 							.catch(err => log.error('Failed to post poll setup message', { pollId: poll.id }, err));
 					}
 				}
 
 				if (updateUnfinishedList) {
-					fs.writeFile(`${folderRoot}/unfinished polls.json`, JSON.stringify(unfinishedPollList), 'utf8', (err) => {
-						if (err) {
-							log.error('Failed to write unfinished polls', { file: 'unfinished polls.json' }, err);
-						}
-					});
+					store.save('unfinishedPolls', unfinishedPollList);
 				}
 			}
 		}
@@ -969,8 +552,8 @@ discordClient.on('message', msg => {
 					allowCommands = false;
 				}
 				else if (msg.content.toLowerCase().startsWith('!poll')) {
-					const setupChannel = getChannel('adminOnly'),
-						announcementsChannel = getChannel('announcements'),
+					const setupChannel = getChannel(guild, 'adminOnly'),
+						announcementsChannel = getChannel(guild, 'announcements'),
 						channel = msg.mentions.channels.first(),
 						embed = new RichEmbed()
 							.setColor(0x1abc9c)
@@ -983,11 +566,7 @@ discordClient.on('message', msg => {
 
 							unfinishedPollList.push(new Poll(member.id, new PollSetupData(setupChannel.id, pollMessage.id), targetChannelId));
 
-							fs.writeFile(`${folderRoot}/unfinished polls.json`, JSON.stringify(unfinishedPollList), 'utf8', (err) => {
-								if (err) {
-									log.error('Failed to write unfinished polls', { file: 'unfinished polls.json' }, err);
-								}
-							});
+							store.save('unfinishedPolls', unfinishedPollList);
 
 							log.info('Poll setup started', { memberId: member.id, channelId: targetChannelId });
 						})
@@ -1007,7 +586,7 @@ discordClient.on('message', msg => {
 					allowCommands = false;
 				}
 				else if (member.id == config.ownerId && msg.content.toLowerCase() == '!ping') {
-					const channel = getChannel('kodamaTest'),
+					const channel = getChannel(guild, 'kodamaTest'),
 						embed = new RichEmbed()
 							.setColor(0x1abc9c)
 							.setDescription('Pong!');
@@ -1017,12 +596,12 @@ discordClient.on('message', msg => {
 					allowCommands = false;
 				}
 				else if (member.id == config.ownerId && msg.content.toLowerCase().startsWith('!announce-events')) {
-					announceNextWeeksEvents(oAuth2Client);
+					googleService.announceNextWeeksEvents(guild, googleService.getAuth());
 
 					allowCommands = false;
 				}
 				else if (member.id == config.ownerId && msg.content.toLowerCase() == '!event-tag-format') {
-					const channel = getChannel('kodamaTest'),
+					const channel = getChannel(guild, 'kodamaTest'),
 						embed = new RichEmbed()
 							.setColor(0x1abc9c)
 							.setTitle('Event Tag Format for Google Calendar')
@@ -1033,7 +612,7 @@ discordClient.on('message', msg => {
 					allowCommands = false;
 				}
 				else if (member.id == config.ownerId && msg.content.toLowerCase() == '!update-introduction') {
-					const channel = getChannel('announcements'),
+					const channel = getChannel(guild, 'announcements'),
 						embed = new RichEmbed()
 							.setColor(0x1abc9c)
 							.setTitle('Hi, I\'m Kodama!')
@@ -1049,7 +628,7 @@ discordClient.on('message', msg => {
 					allowCommands = false;
 				}
 				else if (member.id == config.ownerId && msg.content.toLowerCase().startsWith('!add-to-lobby-list') && msg.content.includes(' ')) {
-					const channel = getChannel('kodamaTest'),
+					const channel = getChannel(guild, 'kodamaTest'),
 						username = msg.content.substr(msg.content.indexOf(' ') + 1).trim(),
 						targetMember = guild.members.find(m => m.displayName == username),
 						embed = new RichEmbed()
@@ -1072,11 +651,7 @@ discordClient.on('message', msg => {
 							.then((msg) => {
 								lobbyList.push({ id: targetMember.id, expirationDate: expirationDate, message_id: msg.id });
 
-								fs.writeFile(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8', function (err) {
-									if (err) {
-										log.error('Failed to write lobby state', { file: 'lobby.json' }, err);
-									}
-								});
+								store.save('lobby', lobbyList);
 							})
 							.catch(err => log.error('Failed to post lobby list notice', { channel: 'kodamaTest' }, err));
 
@@ -1119,15 +694,11 @@ discordClient.on('message', msg => {
 						});
 
 						if (updateLobbyListFile) {
-							fs.writeFile(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8', (err) => {
-								if (err) {
-									log.error('Failed to write lobby state', { file: 'lobby.json' }, err);
-								}
-							});
+							store.save('lobby', lobbyList);
 						}
 
 						if (kickedMembers != '') {
-							const channel = getChannel('kodamaTest'),
+							const channel = getChannel(guild, 'kodamaTest'),
 								embed = new RichEmbed()
 									.setTitle('The following members should be kicked from the lobby!')
 									.setColor(0x1abc9c)
@@ -1137,7 +708,7 @@ discordClient.on('message', msg => {
 								.catch(err => log.error('Failed to post lobby check result', { channel: 'kodamaTest', result: 'kicks' }, err));
 						}
 						else {
-							const channel = getChannel('kodamaTest'),
+							const channel = getChannel(guild, 'kodamaTest'),
 								embed = new RichEmbed()
 									.setTitle('No one to kick from the lobby!')
 									.setColor(0x1abc9c)
@@ -1155,7 +726,7 @@ discordClient.on('message', msg => {
 
 		if (allowCommands && command != '' && member && member.roles.get(config.roles.admin)) {
 			if (command == 'help' || command == 'h') {
-				const channel = getChannel('botSpam'),
+				const channel = getChannel(guild, 'botSpam'),
 					embed = new RichEmbed()
 						.setTitle('Kodama Help Menu')
 						.setColor(0x1abc9c)
@@ -1165,7 +736,7 @@ discordClient.on('message', msg => {
 					.catch(err => log.error('Failed to post help menu', { channel: 'botSpam' }, err));
 			}
 			else if (command == 'server-avatar' || command == 'sa') {
-				const channel = getChannel('botSpam'),
+				const channel = getChannel(guild, 'botSpam'),
 					embed = new RichEmbed()
 						.setTitle('Server Avatar')
 						.setColor(0x1abc9c)
@@ -1176,7 +747,7 @@ discordClient.on('message', msg => {
 					.catch(err => log.error('Failed to post server avatar', { channel: 'botSpam' }, err));
 			}
 			else if (command == 'avatar' || command == 'a') {
-				const channel = getChannel('botSpam'),
+				const channel = getChannel(guild, 'botSpam'),
 					mentions = msg.mentions,
 					mentionedUser = mentions.users.filter(u => u.id != discordClient.user.id).first();
 
@@ -1208,9 +779,9 @@ discordClient.on('message', msg => {
 discordClient.on('guildMemberAdd', member => {
 	log.info('Member joined', { memberId: member.id, displayName: member.displayName });
 
-	const welcomeChannel = getChannel('welcome'),
-		theLobbyChannel = getChannel('lobby'),
-		adminOnlyChannel = getChannel('adminOnly'),
+	const welcomeChannel = getChannel(guild, 'welcome'),
+		theLobbyChannel = getChannel(guild, 'lobby'),
+		adminOnlyChannel = getChannel(guild, 'adminOnly'),
 		dmEmbed = new RichEmbed()
 			.setTitle('Welcome to our server!')
 			.setColor(0x1abc9c)
@@ -1247,11 +818,8 @@ discordClient.on('guildMemberAdd', member => {
 		.then((msg) => {
 			lobbyList.push({ id: member.id, expirationDate: expirationDate, message_id: msg.id });
 
-			fs.writeFile(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8', (err) => {
-				if (err) {
-					log.error('Failed to write lobby state', { file: 'lobby.json' }, err);
-				}
-				else {
+			store.save('lobby', lobbyList, (err) => {
+				if (!err) {
 					log.info('Added member to lobby', { memberId: member.id, displayName: member.displayName, expiresAt: expirationDate.toISOString() });
 				}
 			});
@@ -1264,10 +832,8 @@ discordClient.on('guildMemberRemove', member => {
 
 	let kickedList = [];
 
-	if (fs.existsSync(`${folderRoot}/kicked.json`)) {
-		const kickedContent = fs.readFileSync(`${folderRoot}/kicked.json`);
-
-		kickedList = JSON.parse(kickedContent);
+	if (store.exists('kicked')) {
+		kickedList = store.load('kicked', []);
 	}
 
 	const kickedMemberIndex = kickedList.findIndex(id => id == member.id);
@@ -1276,20 +842,12 @@ discordClient.on('guildMemberRemove', member => {
 		kickedList.splice(kickedMemberIndex, 1);
 		lobbyList = lobbyList.filter(l => l.id != member.id);
 
-		fs.writeFile(`${folderRoot}/kicked.json`, JSON.stringify(kickedList), 'utf8', (err) => {
-			if (err) {
-				log.error('Failed to write kicked state', { file: 'kicked.json' }, err);
-			}
-		});
+		store.save('kicked', kickedList);
 
-		fs.writeFile(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8', (err) => {
-			if (err) {
-				log.error('Failed to write lobby state', { file: 'lobby.json' }, err);
-			}
-		});
+		store.save('lobby', lobbyList);
 	}
 	else {
-		const adminOnlyChannel = getChannel('adminOnly'),
+		const adminOnlyChannel = getChannel(guild, 'adminOnly'),
 			embed = new RichEmbed()
 				.setTitle('A member left!')
 				.setColor(0x1abc9c)
@@ -1331,22 +889,19 @@ discordClient.on('messageReactionAdd', async (reaction, reactionUser) => {
 				unfinishedPoll.options[unfinishedPoll.options.length - 1] = option;
 
 
-				embed.setDescription(unfinishedPoll.getDescriptionForEmbed() + '**Next: Type out another voting option for your poll.**\n\nNote: Type [done] if you are finished adding options.');
+				embed.setDescription(unfinishedPoll.getDescriptionForEmbed(guild) + '**Next: Type out another voting option for your poll.**\n\nNote: Type [done] if you are finished adding options.');
 
 				unfinishedPollList[unfinishedPollIndex] = unfinishedPoll;
 
-				fs.writeFile(`${folderRoot}/unfinished polls.json`, JSON.stringify(unfinishedPollList), 'utf8', (err) => {
-					if (err) {
-						log.error('Failed to write unfinished polls', { file: 'unfinished polls.json' }, err);
-					}
-					else {
+				store.save('unfinishedPolls', unfinishedPollList, (err) => {
+					if (!err) {
 						reaction.message.edit(embed);
 					}
 				});
 			}
 			else {
 				embed.setColor(0xe91e63)
-					.setDescription(unfinishedPoll.getDescriptionForEmbed() + '**ERROR: You must react to this message with a default emoji or a custom emoji from this server!\n\n**Next: React with an emoji for this option.**\n\nNote: The emoji must be a default emoji or a custom emoji from this server.');
+					.setDescription(unfinishedPoll.getDescriptionForEmbed(guild) + '**ERROR: You must react to this message with a default emoji or a custom emoji from this server!\n\n**Next: React with an emoji for this option.**\n\nNote: The emoji must be a default emoji or a custom emoji from this server.');
 
 				reaction.message.edit(embed);
 			}
@@ -1373,11 +928,7 @@ discordClient.on('messageReactionAdd', async (reaction, reactionUser) => {
 			if (!option.memberIds.includes(reactionMember.id)) {
 				option.memberIds.push(reactionMember.id);
 
-				fs.writeFile(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8', (err) => {
-					if (err) {
-						log.error('Failed to write open polls', { file: 'open polls.json' }, err);
-					}
-				});
+				store.save('openPolls', openPollList);
 			}
 		}
 	}
@@ -1420,11 +971,7 @@ discordClient.on('messageReactionRemove', async (reaction, reactionUser) => {
 
 			option.memberIds = option.memberIds.filter(i => i != reactionMember.id);
 
-			fs.writeFile(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8', (err) => {
-				if (err) {
-					log.error('Failed to write open polls', { file: 'open polls.json' }, err);
-				}
-			});
+			store.save('openPolls', openPollList);
 		}
 	}
 });

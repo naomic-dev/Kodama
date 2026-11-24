@@ -68,6 +68,15 @@ The bot is a single Node process built on `discord.js` v11:
 index.js                     Discord client, event handlers, command router
 config.js                    Loads, merges, and validates config.json
 logger.js                    Dependency-free structured logger
+lib/
+  channels.js                Channel lookup by configured name or ID
+  time.js                    Date and time formatting
+models/
+  poll.js                    Poll, PollOption, PollSetupData, OptionEmoji
+store/
+  jsonStore.js               JSON state loading and persistence
+services/
+  google.js                  OAuth, Calendar query, event embeds
 config.json                  Server IDs, roles, channels, calendar (not committed)
 .env                         Bot token and environment flags (not committed)
 google_credentials.json      Google OAuth client (not committed)
@@ -80,12 +89,13 @@ data/                        Runtime JSON state (not committed)
   kicked.json                Members removed by the lobby job
 ```
 
-Major pieces inside `index.js`:
+Major pieces:
 
 - **Configuration** — `config.js` merges `config.json` over defaults, validates the required values, and fails fast with a list of anything missing.
 - **Logging** — `logger.js` emits structured text or JSON lines with levels, timestamps, context, and serialized errors.
-- **Poll engine** — `Poll`, `PollOption`, and `PollSetupData` model a guided setup state machine; message handlers advance it, and `node-schedule` closes polls at their expiration.
-- **Google integration** — `setGoogleApiAuth` performs the installed-app OAuth flow and caches a token; `announceNextWeeksEvents` maps calendar entries to embeds.
+- **Poll engine** — `models/poll.js` holds `Poll`, `PollOption`, and `PollSetupData`; the message handlers in `index.js` advance the guided setup state machine, and `node-schedule` closes polls at their expiration.
+- **State** — `store/jsonStore.js` centralizes reads and writes for every runtime JSON file, including `DATA_DIR` handling and error logging.
+- **Google integration** — `services/google.js` performs the installed-app OAuth flow, queries the calendar, and maps events to embeds.
 - **Lobby lifecycle** — `guildMemberAdd`/`guildMemberRemove` and the midnight job keep `lobby.json` in sync with Discord.
 - **Scheduling** — `node-schedule` runs midnight maintenance, poll closures, and a keep-alive typing job.
 - **Raw reaction handler** — a `raw` packet listener re-fetches uncached messages so reactions work on older messages.
@@ -175,7 +185,7 @@ npm start
 This is a faithful snapshot, not a maintained product. If I picked it up again:
 
 - [ ] Migrate to `discord.js` v14 with intents and slash commands.
-- [ ] Split `index.js` into `commands/`, `events/`, `services/`, and `models/`.
+- [ ] Split the remaining handlers out of `index.js` into `commands/` and `events/`.
 - [ ] Replace JSON persistence with SQLite and transaction-safe writes.
 - [ ] Add unit tests for the poll state machine and lobby expiry logic.
 - [ ] Replace `console.log` with structured logging.
