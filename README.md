@@ -45,9 +45,9 @@ Commands can be prefixed with `@Kodama`, `kodama!`, or `kod!`.
 
 | Command | Scope | Description |
 | --- | --- | --- |
-| `help`, `h` | Members | Show the help menu. |
-| `server-avatar`, `sa` | Members | Post the server's icon. |
-| `avatar @user`, `a @user` | Members | Post a member's avatar. |
+| `help`, `h` | Members or Admin | Show the help menu. |
+| `server-avatar`, `sa` | Members or Admin | Post the server's icon. |
+| `avatar @user`, `a @user` | Members or Admin | Post a member's avatar. |
 | `!admit @user` | Admin | Verify a member and assign roles. |
 | `!poll [#channel]` | Admin | Start guided poll setup. |
 | `!say #channel <text>` | Owner | Post an embed as the bot. |
@@ -60,14 +60,26 @@ Commands can be prefixed with `@Kodama`, `kodama!`, or `kod!`.
 
 Reacting to a lobby entry with any emoji verifies that member; 👎 is logged as a rejection.
 
+Utility commands are available to verified members and admins; the remaining commands require the admin role (and the owner-only commands additionally require `ownerId`).
+
 ## Architecture
 
 The bot is a single Node process built on `discord.js` v11:
 
 ```
-index.js                     Discord client, event handlers, command router
+index.js                     Bootstrap: client, event registration, login
 config.js                    Loads, merges, and validates config.json
 logger.js                    Dependency-free structured logger
+commands/
+  admin.js                   Owner and admin commands
+  pollSetup.js               Guided poll setup state machine
+  utility.js                 Help and avatar commands
+  index.js                   Command dispatcher exports
+events/
+  ready.js                   Startup, state loading, scheduling
+  message.js                 DM forwarding and command routing
+  members.js                 Join and leave lifecycle
+  reactions.js               Poll votes, lobby reactions, raw packets
 lib/
   channels.js                Channel lookup by configured name or ID
   time.js                    Date and time formatting
@@ -75,8 +87,12 @@ models/
   poll.js                    Poll, PollOption, PollSetupData, OptionEmoji
 store/
   jsonStore.js               JSON state loading and persistence
+  state.js                   Shared in-memory state
 services/
   google.js                  OAuth, Calendar query, event embeds
+  lobby.js                   Admission and role backfill
+  polls.js                   Poll closing and scheduling
+  scheduler.js               Midnight maintenance job
 config.json                  Server IDs, roles, channels, calendar (not committed)
 .env                         Bot token and environment flags (not committed)
 google_credentials.json      Google OAuth client (not committed)
@@ -93,12 +109,13 @@ Major pieces:
 
 - **Configuration** — `config.js` merges `config.json` over defaults, validates the required values, and fails fast with a list of anything missing.
 - **Logging** — `logger.js` emits structured text or JSON lines with levels, timestamps, context, and serialized errors.
-- **Poll engine** — `models/poll.js` holds `Poll`, `PollOption`, and `PollSetupData`; the message handlers in `index.js` advance the guided setup state machine, and `node-schedule` closes polls at their expiration.
-- **State** — `store/jsonStore.js` centralizes reads and writes for every runtime JSON file, including `DATA_DIR` handling and error logging.
+- **Commands and events** — `events/` wires Discord events to `commands/`; the message handler only parses prefixes and dispatches.
+- **Poll engine** — `models/poll.js` holds the poll classes, `commands/pollSetup.js` advances the guided setup state machine, and `services/polls.js` closes polls at their expiration.
+- **State** — `store/jsonStore.js` centralizes reads and writes for every runtime JSON file, including `DATA_DIR` handling and error logging; `store/state.js` holds the live guild and poll/lobby lists.
 - **Google integration** — `services/google.js` performs the installed-app OAuth flow, queries the calendar, and maps events to embeds.
-- **Lobby lifecycle** — `guildMemberAdd`/`guildMemberRemove` and the midnight job keep `lobby.json` in sync with Discord.
-- **Scheduling** — `node-schedule` runs midnight maintenance, poll closures, and a keep-alive typing job.
-- **Raw reaction handler** — a `raw` packet listener re-fetches uncached messages so reactions work on older messages.
+- **Lobby lifecycle** — `events/members.js` and `services/scheduler.js` keep `lobby.json` in sync with Discord; `services/lobby.js` handles admission and role backfill.
+- **Scheduling** — `services/scheduler.js` runs the midnight maintenance job and `services/polls.js` schedules poll closures.
+- **Raw reaction handler** — `events/reactions.js` re-fetches uncached messages so reactions work on older messages.
 
 ## Requirements
 
@@ -185,7 +202,6 @@ npm start
 This is a faithful snapshot, not a maintained product. If I picked it up again:
 
 - [ ] Migrate to `discord.js` v14 with intents and slash commands.
-- [ ] Split the remaining handlers out of `index.js` into `commands/` and `events/`.
 - [ ] Replace JSON persistence with SQLite and transaction-safe writes.
 - [ ] Add unit tests for the poll state machine and lobby expiry logic.
 - [ ] Replace `console.log` with structured logging.
