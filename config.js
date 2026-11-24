@@ -32,8 +32,7 @@ const DEFAULTS = {
 	},
 	google: {
 		calendarId: '',
-		eventQuery: '',
-		spreadsheetId: ''
+		eventQuery: ''
 	},
 	eventImages: {
 		mainMunch: '',

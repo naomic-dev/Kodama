@@ -7,23 +7,19 @@ const path = require('path');
 const schedule = require('node-schedule');
 const uuid = require('uuid/v1');
 
-//Required for Google Sheets
+//Required for Google Calendar
 const readline = require('readline');
 const { google } = require('googleapis');
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly', 'https://www.googleapis.com/auth/calendar.readonly'];
+const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 const TOKEN_PATH = 'token.json';
 let oAuth2Client = null;
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 let guild = null;
-let pollList = [];
 let unfinishedPollList = [];
 let openPollList = [];
 let lobbyList = [];
-
-//An array of objects that maps user names to Discord IDs
-let nameDiscordIdMappings = [];
 
 //Look up a configured channel by name or ID
 function getChannel(key) {
@@ -222,7 +218,7 @@ function admitMember(targetMember) {
 
 			adminOnlyChannel.send(dmConfirmEmbed)
 				.catch(console.error);
-		});
+		}).catch(console.error);
 	}
 	else {
 		adminOnlyEmbed.setDescription(`User not found!`);
@@ -292,21 +288,6 @@ function newEventEmbed(event) {
 	}
 
 	if (type && url) {
-		let titleNote = '',
-			descriptionNote;
-
-		if (event.description.includes('[title note:')) {
-			startIndex = event.description.indexOf('[title note:') + 12;
-			endIndex = event.description.indexOf(']', startIndex);
-			titleNote = event.description.substring(startIndex, endIndex);
-		}
-
-		if (event.description.includes('[desc note:')) {
-			startIndex = event.description.indexOf('[desc note:') + 11;
-			endIndex = event.description.indexOf(']', startIndex);
-			descriptionNote = event.description.substring(startIndex, endIndex);
-		}
-
 		const embed = new RichEmbed()
 			.setColor(0x1abc9c)
 			.setURL(url);
@@ -386,13 +367,13 @@ function newEventEmbed(event) {
 }
 
 function setGoogleApiAuth() {
-	if (!fs.existsSync('sheets_credentials.json')) {
+	if (!fs.existsSync('google_credentials.json')) {
 		throw new Error(
-			'Missing sheets_credentials.json. Copy sheets_credentials.example.json and add your Google OAuth client credentials.'
+			'Missing google_credentials.json. Copy google_credentials.example.json and add your Google OAuth client credentials.'
 		);
 	}
 
-	const content = fs.readFileSync('sheets_credentials.json');
+	const content = fs.readFileSync('google_credentials.json');
 	const credentials = JSON.parse(content);
 	const { client_secret, client_id, redirect_uris } = credentials.installed;
 	oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
@@ -432,66 +413,6 @@ function setGoogleApiAuth() {
 	const token = fs.readFileSync(TOKEN_PATH);
 
 	oAuth2Client.setCredentials(JSON.parse(token));
-}
-
-/**
- * Prints the names and Discord IDs of users in the server:
- * @param {google.auth.OAuth2} auth The authenticated Google OAuth client.
- */
-function readUsersFromSheets(auth) {
-	const sheets = google.sheets({ version: 'v4', auth });
-
-	sheets.spreadsheets.values.get({
-		spreadsheetId: config.google.spreadsheetId,
-		range: 'Users!A2:D',
-	},
-		(err, res) => {
-			if (err) return console.log('The API returned an error: ' + err);
-
-			const rows = res.data.values;
-
-			if (rows.length) {
-				rows.map((row) => {
-					if (row[1]) {
-						nameDiscordIdMappings.push({ name: row[1], discordId: row[3] });
-					}
-				});
-			} else {
-				console.log('No data found.');
-			}
-
-			console.log(rows);
-		});
-}
-
-/**
- * Lists the next 10 events on the user's primary calendar.
- * @param {google.auth.OAuth2} auth An authorized OAuth2 client.
- */
-function getNextEvent(auth) {
-	const calendar = google.calendar({ version: 'v3', auth }),
-		date = new Date();
-
-	calendar.events.list({
-		calendarId: config.google.calendarId,
-		timeMin: date.toISOString(),
-		timeMax: (new Date(date.setTime(date.getTime() + 7 * 86400000))).toISOString(),
-		maxResults: 1,
-		singleEvents: true,
-		orderBy: 'startTime',
-		q: config.google.eventQuery
-	},
-		(err, res) => {
-			if (err) return console.log('The API returned an error: ' + err);
-
-			const events = res.data.items;
-
-			if (events.length) {
-				return events[0];
-			}
-
-			return null;
-		});
 }
 
 function announceNextWeeksEvents(auth) {
@@ -584,7 +505,15 @@ function scheduleMidnightJobs() {
 			lobbyList = JSON.parse(content);
 
 			let updateLobbyListFile = false,
-				kickedMembers = '';
+				updateKickedListFile = false,
+				kickedMembers = '',
+				kickedList = [];
+
+			if (fs.existsSync(`${folderRoot}/kicked.json`)) {
+				const kickedContent = fs.readFileSync(`${folderRoot}/kicked.json`);
+
+				kickedList = JSON.parse(kickedContent);
+			}
 
 			const dmEmbed = new RichEmbed()
 				.setTitle('You\'ve been removed from the server.')
@@ -595,21 +524,17 @@ function scheduleMidnightJobs() {
 				const member = guild.members.find(m => m.id == loiterer.id);
 
 				if (member && member.roles.get(config.roles.admin) == null && new Date(loiterer.expirationDate) <= new Date()) {
-					let kickedList = [];
-
-					if (fs.existsSync(`${folderRoot}/kicked.json`)) {
-						const kickedContent = fs.readFileSync(`${folderRoot}/kicked.json`);
-
-						kickedList = JSON.parse(kickedContent);
+					if (!kickedList.includes(member.id)) {
+						kickedList.push(member.id);
 					}
 
-					kickedList.push(member.id);
-
-					fs.writeFileSync(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8');
+					updateKickedListFile = true;
 
 					member.send(dmEmbed)
-						.then(() => { member.send('invite link'); })
-						.then(() => { member.kick(); });
+						.then(() => member.send('invite link'))
+						.catch(console.error)
+						.then(() => member.kick())
+						.catch(console.error);
 
 					kickedMembers += member + '\n';
 
@@ -628,6 +553,10 @@ function scheduleMidnightJobs() {
 						console.log(err);
 					}
 				});
+			}
+
+			if (updateKickedListFile) {
+				fs.writeFileSync(`${folderRoot}/kicked.json`, JSON.stringify(kickedList), 'utf8');
 			}
 
 			if (kickedMembers != '') {
@@ -746,8 +675,8 @@ discordClient.on('message', msg => {
 		contentToLowerCase = msg.content.toLowerCase();
 
 	if (msg.channel.type == 'dm' && msg.author.id != discordClient.user.id) {
-		const channel = getChannel('adminOnly')
-		embed = new RichEmbed()
+		const channel = getChannel('adminOnly'),
+			embed = new RichEmbed()
 			.setColor(0x1abc9c)
 			.setTitle(`${msg.author.username} sent Kodama a DM`);
 
@@ -772,7 +701,7 @@ discordClient.on('message', msg => {
 	}
 	else {
 		let allowCommands = true;
-		command = '',
+		let command = '',
 			messageBody = '';
 
 		if (msg.content.startsWith(`<@!${discordClient.user.id}>`)) {
@@ -893,8 +822,6 @@ discordClient.on('message', msg => {
 					embed.setTitle('Poll Set Up Complete!');
 
 					unfinishedPollList = unfinishedPollList.filter(p => p.memberId != member.id);
-
-					let openPollList = [];
 
 					if (fs.existsSync(`${folderRoot}/open polls.json`)) {
 						const content = fs.readFileSync(`${folderRoot}/open polls.json`);
@@ -1224,8 +1151,8 @@ discordClient.on('message', msg => {
 					mentionedUser = mentions.users.filter(u => u.id != discordClient.user.id).first();
 
 				if (mentionedUser) {
-					const mentionedMember = mentions.members.first()
-					embed = new RichEmbed()
+					const mentionedMember = mentions.members.first(),
+						embed = new RichEmbed()
 						.setTitle(`${mentionedMember.displayName}'s Avatar`)
 						.setColor(0x1abc9c)
 						.setDescription(msg.member)
@@ -1243,26 +1170,6 @@ discordClient.on('message', msg => {
 					channel.send(embed)
 						.catch(console.error);
 				}
-			}
-			else if (command == 'poll') {
-				return;
-
-				const channel = getChannel('botSpam'),
-					embed = new RichEmbed()
-						.setColor(0x1abc9c)
-						.setTitle('New Poll Set Up')
-						.setDescription(`Creator: ${member}\n\nTitle:\nDescription:\nExpiration Date:\nOptions:\n\n**Select a title for your poll**`);
-
-				channel.send(embed)
-					.then((pollMessage) => {
-						unfinishedPollList.push(new Poll(member.id, new PollSetupData(channel.id, pollMessage.id), channel.id));
-
-						fs.writeFile(`${folderRoot}/unfinished polls.json`, JSON.stringify(unfinishedPollList), 'utf8', (err) => {
-							if (err) {
-								console.log(err);
-							}
-						});
-					});
 			}
 		}
 	}
@@ -1301,10 +1208,10 @@ discordClient.on('guildMemberAdd', member => {
 
 			adminOnlyChannel.send(dmConfirmEmbed)
 				.catch(console.error);
-		});
+		})
+		.catch(console.error);
 
 	adminOnlyChannel.send(adminOnlyEmbed)
-		.catch(console.error)
 		.then((msg) => {
 			lobbyList.push({ id: member.id, expirationDate: expirationDate, message_id: msg.id });
 
@@ -1316,7 +1223,8 @@ discordClient.on('guildMemberAdd', member => {
 					console.log(`Added ${member.displayName} to \"lobby.json\"\n`);
 				}
 			});
-		});
+		})
+		.catch(console.error);
 });
 
 discordClient.on('guildMemberRemove', member => {
@@ -1328,10 +1236,17 @@ discordClient.on('guildMemberRemove', member => {
 		kickedList = JSON.parse(kickedContent);
 	}
 
-	const kickedMember = kickedList.find(m => m.id == member.id);
+	const kickedMemberIndex = kickedList.findIndex(id => id == member.id);
 
-	if (kickedMember) {
-		kickedList = kickedList.filter(m => m.id != member.id);
+	if (kickedMemberIndex != -1) {
+		kickedList.splice(kickedMemberIndex, 1);
+		lobbyList = lobbyList.filter(l => l.id != member.id);
+
+		fs.writeFile(`${folderRoot}/kicked.json`, JSON.stringify(kickedList), 'utf8', (err) => {
+			if (err) {
+				console.log(err);
+			}
+		});
 
 		fs.writeFile(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8', (err) => {
 			if (err) {
@@ -1352,10 +1267,19 @@ discordClient.on('guildMemberRemove', member => {
 });
 
 discordClient.on('messageReactionAdd', async (reaction, reactionUser) => {
-	const reactionMember = guild.member(reactionUser),
-		unfinishedPollIndex = unfinishedPollList.findIndex(p => p.memberId == reactionMember.id && p.setupData && p.setupData.messageId == reaction.message.id),
+	if (!reaction || !reactionUser || reactionUser.bot) {
+		return;
+	}
+
+	const reactionMember = guild.member(reactionUser);
+
+	if (!reactionMember) {
+		return;
+	}
+
+	const unfinishedPollIndex = unfinishedPollList.findIndex(p => p.memberId == reactionMember.id && p.setupData && p.setupData.messageId == reaction.message.id),
 		openPollIndex = (unfinishedPollIndex != -1 ? -1 : openPollList.findIndex(p => p.messageId == reaction.message.id)),
-		lobbyListIndex = (unfinishedPollIndex != -1 || openPollIndex != -1 ? -1 : lobbyList.findIndex(l => l.messageId == reaction.message.id));
+		lobbyListIndex = (unfinishedPollIndex != -1 || openPollIndex != -1 ? -1 : lobbyList.findIndex(l => l.message_id == reaction.message.id));
 
 	if (unfinishedPollIndex != -1 && unfinishedPollList[unfinishedPollIndex]) {
 		const unfinishedPoll = unfinishedPollList[unfinishedPollIndex];
@@ -1409,41 +1333,65 @@ discordClient.on('messageReactionAdd', async (reaction, reactionUser) => {
 
 		const optionListIndex = openPollList[openPollIndex].options.findIndex(o => o.emoji.name == reaction.emoji.name && o.emoji.id == reaction.emoji.id);
 
-		openPollList[openPollIndex].options[optionListIndex].memberIds.push(reactionMember.id);
+		if (optionListIndex != -1) {
+			const option = openPollList[openPollIndex].options[optionListIndex];
 
-		fs.writeFile(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8', (err) => {
-			if (err) {
-				console.log(err);
+			if (!option.memberIds.includes(reactionMember.id)) {
+				option.memberIds.push(reactionMember.id);
+
+				fs.writeFile(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8', (err) => {
+					if (err) {
+						console.log(err);
+					}
+				});
 			}
-		});
+		}
 	}
-	else if (lobbyListIndex != 1 && lobbyList[lobbyListIndex]) {
+	else if (lobbyListIndex != -1 && lobbyList[lobbyListIndex]) {
+		const loiterer = lobbyList[lobbyListIndex],
+			loitererMember = guild.members.find(m => m.id == loiterer.id);
+
+		if (!loitererMember) {
+			return;
+		}
+
 		if (reaction.emoji.name == "👎") {
-			console.log('Reject ' + guild.members.find(m => m.id == loiterer.id).displayName);
+			console.log('Reject ' + loitererMember.displayName);
 		}
 		else {
-			const loiterer = lobbyList[lobbyListIndex];
-
-			console.log('Admit ' + guild.members.find(m => m.id == loiterer.id).displayName + ' -- Reaction');
-			admitMember(guild.members.find(m => m.id == loiterer.id));
+			console.log('Admit ' + loitererMember.displayName + ' -- Reaction');
+			admitMember(loitererMember);
 		}
 	}
 });
 
 discordClient.on('messageReactionRemove', async (reaction, reactionUser) => {
-	const reactionMember = guild.member(reactionUser),
-		openPollIndex = openPollList.findIndex(p => reaction && p.messageId == reaction.message.id);
+	if (!reaction || !reactionUser || reactionUser.bot) {
+		return;
+	}
+
+	const reactionMember = guild.member(reactionUser);
+
+	if (!reactionMember) {
+		return;
+	}
+
+	const openPollIndex = openPollList.findIndex(p => p.messageId == reaction.message.id);
 
 	if (openPollIndex != -1 && openPollList[openPollIndex]) {
 		const optionListIndex = openPollList[openPollIndex].options.findIndex(o => o.emoji.name == reaction.emoji.name && o.emoji.id == reaction.emoji.id);
 
-		openPollList[openPollIndex].options[optionListIndex].memberIds = openPollList[openPollIndex].options[optionListIndex].memberIds.filter(i => i != reactionMember.id);
+		if (optionListIndex != -1) {
+			const option = openPollList[openPollIndex].options[optionListIndex];
 
-		fs.writeFile(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8', (err) => {
-			if (err) {
-				console.log(err);
-			}
-		});
+			option.memberIds = option.memberIds.filter(i => i != reactionMember.id);
+
+			fs.writeFile(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8', (err) => {
+				if (err) {
+					console.log(err);
+				}
+			});
+		}
 	}
 });
 
@@ -1452,7 +1400,7 @@ discordClient.on('raw', packet => {
 
 	const channel = discordClient.channels.get(packet.d.channel_id);
 
-	if (channel.messages.has(packet.d.message_id)) return;
+	if (!channel || channel.messages.has(packet.d.message_id)) return;
 
 	channel.fetchMessage(packet.d.message_id).then(message => {
 		// Emojis can have identifiers of name:id format, so we have to account for that case as well
@@ -1461,8 +1409,10 @@ discordClient.on('raw', packet => {
 		// This gives us the reaction we need to emit the event properly, in top of the message object
 		const reaction = message.reactions.get(emoji);
 
+		if (!reaction) return;
+
 		// Adds the currently reacting user to the reaction's users collection.
-		if (reaction) reaction.users.set(packet.d.user_id, discordClient.users.get(packet.d.user_id));
+		reaction.users.set(packet.d.user_id, discordClient.users.get(packet.d.user_id));
 
 		// Check which type of event it is before emitting
 		if (packet.t === 'MESSAGE_REACTION_ADD') {
@@ -1472,5 +1422,5 @@ discordClient.on('raw', packet => {
 		if (packet.t === 'MESSAGE_REACTION_REMOVE') {
 			discordClient.emit('messageReactionRemove', reaction, discordClient.users.get(packet.d.user_id));
 		}
-	});
+	}).catch(console.error);
 });

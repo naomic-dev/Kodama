@@ -29,8 +29,7 @@
   },
   "google": {
     "calendarId": "YOUR_CALENDAR_ID",
-    "eventQuery": "",
-    "spreadsheetId": ""
+    "eventQuery": ""
   },
   "eventImages": {
     "mainMunch": "",

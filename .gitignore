@@ -10,7 +10,7 @@ yarn-error.log*
 !.env.example
 
 # Google API credentials and tokens
-sheets_credentials.json
+google_credentials.json
 calendar_credentials.json
 token.json
 *.credentials.json

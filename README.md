@@ -69,7 +69,7 @@ index.js                     Discord client, event handlers, command router
 config.js                    Loads, merges, and validates config.json
 config.json                  Server IDs, roles, channels, calendar (not committed)
 .env                         Bot token and environment flags (not committed)
-sheets_credentials.json      Google OAuth client (not committed)
+google_credentials.json      Google OAuth client (not committed)
 token.json                   Google OAuth token, generated on first run (not committed)
 data/                        Runtime JSON state (not committed)
   lobby.json                 Pending members and expiry dates
@@ -92,7 +92,7 @@ Major pieces inside `index.js`:
 
 - Node.js 12–14 (this snapshot targets `discord.js` v11, whose native dependencies do not build on newer Node releases; see the [roadmap](#roadmap))
 - A Discord application and bot token
-- A Google Cloud project with the **Calendar** and **Sheets** APIs enabled and a Desktop OAuth client
+- A Google Cloud project with the **Calendar** API enabled and a Desktop OAuth client
 
 ## Setup
 
@@ -108,10 +108,10 @@ Create an application at <https://discord.com/developers/applications>, add a bo
 
 ### 3. Create Google credentials
 
-In Google Cloud Console, enable the Calendar and Sheets APIs, create an OAuth client of type **Desktop app**, and download the JSON. Save it as `sheets_credentials.json`:
+In Google Cloud Console, enable the Calendar API, create an OAuth client of type **Desktop app**, and download the JSON. Save it as `google_credentials.json`:
 
 ```bash
-cp sheets_credentials.example.json sheets_credentials.json
+cp google_credentials.example.json google_credentials.json
 # then paste in your client_id, client_secret, and project_id
 ```
 
@@ -150,7 +150,6 @@ cp config.example.json config.json
 | `messages.introduction` | ID of the pinned introduction message. |
 | `google.calendarId` | Calendar to read events from. |
 | `google.eventQuery` | Optional title filter for calendar events. |
-| `google.spreadsheetId` | Member roster spreadsheet (reserved; not used yet). |
 | `eventImages.*` | Optional image URLs for each event type. |
 
 ### 6. Run
