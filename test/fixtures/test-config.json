@@ -1,0 +1,15 @@
+{
+  "guildId": "guild-1",
+  "ownerId": "owner-1",
+  "roles": {
+    "admin": "role-admin",
+    "member": "role-member",
+    "dmsClosed": "role-dms"
+  },
+  "messages": {
+    "introduction": "message-intro"
+  },
+  "google": {
+    "calendarId": "calendar-1"
+  }
+}

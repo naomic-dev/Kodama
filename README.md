@@ -93,6 +93,12 @@ services/
   lobby.js                   Admission and role backfill
   polls.js                   Poll closing and scheduling
   scheduler.js               Midnight maintenance job
+test/
+  harness.js                 Minimal async test runner
+  poll.test.js               Poll model
+  pollSetup.test.js          Guided poll setup state machine
+  lobby.test.js              Lobby expiry
+  fixtures/test-config.json  Test configuration
 config.json                  Server IDs, roles, channels, calendar (not committed)
 .env                         Bot token and environment flags (not committed)
 google_credentials.json      Google OAuth client (not committed)
@@ -189,6 +195,14 @@ cp config.example.json config.json
 npm start
 ```
 
+## Tests
+
+```bash
+npm test
+```
+
+The suite uses Node's built-in `assert` and runs each file in a separate process, so it adds no dependencies. It covers the poll model, the guided setup state machine, expired-poll closure, and lobby expiry. Tests point `CONFIG_PATH` at a fixture and use a temporary `DATA_DIR`.
+
 ## Design notes
 
 - **JSON files instead of a database.** The server was small and the data was tiny; flat files kept the Pi deployment to a single process with no services to run. The trade-off is no atomic writes and no concurrency control, which is the first thing I would change.
@@ -203,7 +217,6 @@ This is a faithful snapshot, not a maintained product. If I picked it up again:
 
 - [ ] Migrate to `discord.js` v14 with intents and slash commands.
 - [ ] Replace JSON persistence with SQLite and transaction-safe writes.
-- [ ] Add unit tests for the poll state machine and lobby expiry logic.
 - [ ] Replace `console.log` with structured logging.
 - [ ] Add a Dockerfile and document the Raspberry Pi service unit.
 - [ ] Add screenshots and a short demo recording.

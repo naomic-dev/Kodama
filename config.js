@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const log = require('./logger');
 
-const CONFIG_PATH = path.join(__dirname, 'config.json');
+const CONFIG_PATH = process.env.CONFIG_PATH || path.join(__dirname, 'config.json');
 
 const DEFAULTS = {
 	guildId: '',

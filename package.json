@@ -5,7 +5,8 @@
   "description": "Administrative Discord bot for community onboarding, lobby management, polls, and Google Calendar event announcements.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node test/poll.test.js && node test/pollSetup.test.js && node test/lobby.test.js"
   },
   "engines": {
     "node": ">=12 <15"
