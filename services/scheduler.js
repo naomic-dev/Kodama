@@ -66,7 +66,7 @@ async function expireLobbyMembers(now = new Date()) {
 	}
 
 	if (updateLobbyListFile) {
-		store.save('lobby', state.lobbyList);
+		store.saveSync('lobby', state.lobbyList);
 	}
 
 	if (updateKickedListFile) {
