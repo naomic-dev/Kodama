@@ -579,32 +579,46 @@ function scheduleMidnightJobs() {
 	});
 }
 
+function closePoll(poll) {
+	Object.setPrototypeOf(poll, Poll.prototype);
+
+	const channel = guild.channels.find(ch => ch.id == poll.channelId),
+		embed = new RichEmbed()
+			.setTitle(`Poll '${poll.title}' has closed!`)
+			.setColor(0x1abc9c)
+			.setDescription(poll.getDescriptionForEmbed('closed'));
+
+	if (channel) {
+		channel.send(embed)
+			.catch(console.error);
+	}
+
+	openPollList = openPollList.filter(p => p.id != poll.id);
+
+	try {
+		fs.writeFileSync(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8');
+	}
+	catch (err) {
+		console.log(err);
+	}
+}
+
+function schedulePollClosure(poll) {
+	const expiration = new Date(poll.expirationDate);
+
+	//Close polls that expired while the bot was offline instead of scheduling a job in the past.
+	if (Number.isNaN(expiration.getTime()) || expiration.getTime() <= Date.now()) {
+		console.log(`Closing expired poll: ${poll.title}`);
+
+		closePoll(poll);
+		return;
+	}
+
+	schedule.scheduleJob(expiration, () => closePoll(poll));
+}
+
 function schedulePollClosures() {
-	openPollList.forEach((poll) => {
-		Object.setPrototypeOf(poll, Poll.prototype);
-
-		const date = new Date(poll.expirationDate);
-
-		//Remove open polls from the open poll list if they're past expiration date.
-
-		schedule.scheduleJob(date, () => {
-			const channel = guild.channels.find(ch => ch.id == poll.channelId),
-				embed = new RichEmbed()
-					.setTitle(`Poll \'${poll.title}\' has closed!`)
-					.setColor(0x1abc9c)
-					.setDescription(poll.getDescriptionForEmbed('closed'));
-
-			channel.send(embed);
-
-			openPollList = openPollList.filter(p => p.id != poll.id);
-
-			fs.writeFile(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8', (err) => {
-				if (err) {
-					console.log(err);
-				}
-			});
-		});
-	});
+	openPollList.slice().forEach(poll => schedulePollClosure(poll));
 }
 
 function scheduleIdleBreaker() {
@@ -849,25 +863,7 @@ discordClient.on('message', msg => {
 								await newPollMessage.react(emoji);
 							});
 
-							const date = new Date(poll.expirationDate);
-
-							schedule.scheduleJob(date, () => {
-								const channel = guild.channels.find(ch => ch.id == poll.channelId),
-									embed = new RichEmbed()
-										.setTitle(`Poll \'${poll.title}\' has closed!`)
-										.setColor(0x1abc9c)
-										.setDescription(poll.getDescriptionForEmbed('closed'));
-
-								channel.send(embed);
-
-								openPollList = openPollList.filter(p => p.id != poll.id);
-
-								fs.writeFile(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8', (err) => {
-									if (err) {
-										console.log(err);
-									}
-								});
-							});
+							schedulePollClosure(poll);
 						});
 				}
 				else {
