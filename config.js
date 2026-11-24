@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const log = require('./logger');
 
 const CONFIG_PATH = path.join(__dirname, 'config.json');
 
@@ -78,7 +79,7 @@ function load() {
 		fileConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 	}
 	else {
-		console.warn('No config.json found. Copy config.example.json to config.json and fill it in.');
+		log.warn('No config.json found; using defaults. Copy config.example.json to config.json and fill it in.');
 	}
 
 	return merge(DEFAULTS, fileConfig);

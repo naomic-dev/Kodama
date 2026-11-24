@@ -1,5 +1,6 @@
 require('dotenv').config();
 const config = require('./config');
+const log = require('./logger');
 const { Client, RichEmbed } = require('discord.js');
 const discordClient = new Client();
 const fs = require('fs');
@@ -52,8 +53,10 @@ const folderRoot = (process.env.DEV == "true" ?
 // Ensure the state directory exists before any read or write.
 fs.mkdirSync(folderRoot, { recursive: true });
 
-console.log('DEV: ' + process.env.DEV);
-console.log('Data directory: ' + folderRoot);
+log.info('Starting Kodama', {
+	dev: process.env.DEV === 'true',
+	dataDirectory: folderRoot
+});
 
 discordClient.login(process.env.BOT_TOKEN);
 
@@ -182,6 +185,8 @@ function admitMember(targetMember) {
 
 		targetMember.addRoles([config.roles.member, config.roles.dmsClosed])
 
+		log.info('Member admitted', { memberId: targetMember.id, displayName: targetMember.displayName });
+
 		adminOnlyEmbed.setTitle('A member has been admitted!');
 
 		let adminOnlyEmbedDescription = `${targetMember.displayName} has been assigned the Member and DMs Closed roles.`;
@@ -205,10 +210,10 @@ function admitMember(targetMember) {
 			.setDescription(`Hi, ${targetMember.displayName}!\n\n**Here's a quick run-down on our rules:**\n1. This server is 18+ only.\n2. Do not post illegal content.\n3. Be a good person.\n\nThese aren't all of the rules, but they're the most important ones. A more comprehensive list can be found in ${rulesChannel}, so be sure to take a look when you can.\n\nIf you head to ${selfAssignRolesChannel}, you will find a list of roles (including pronouns and name colors) you can assign yourself. All you need to do is emoji react to the requisite role menus!\n\nIf you want to learn more about our server or Discord in general, head over to ${infoAndFaqChannel}.\n\nFinally, feel free to introduce yourself in ${introductionsChannel} and let everyone know a little bit about you.`);
 
 		adminOnlyChannel.send(adminOnlyEmbed)
-			.catch(console.error);
+			.catch(err => log.error('Failed to post admission notice', { memberId: targetMember.id, channel: 'adminOnly' }, err));
 
 		introductionsChannel.send(introductionsEmbed)
-			.catch(console.error);
+			.catch(err => log.error('Failed to post introduction', { memberId: targetMember.id, channel: 'introductions' }, err));
 
 		targetMember.send(dmEmbed).then(() => {
 			const dmConfirmEmbed = new RichEmbed()
@@ -217,14 +222,14 @@ function admitMember(targetMember) {
 				.setDescription(`Successfully DM'd ${targetMember.displayName} a run-down of the rules.`);
 
 			adminOnlyChannel.send(dmConfirmEmbed)
-				.catch(console.error);
-		}).catch(console.error);
+				.catch(err => log.error('Failed to confirm admission DM', { memberId: targetMember.id }, err));
+		}).catch(err => log.error('Failed to DM admitted member', { memberId: targetMember.id }, err));
 	}
 	else {
 		adminOnlyEmbed.setDescription(`User not found!`);
 
 		adminOnlyChannel.send(adminOnlyEmbed)
-			.catch(console.error);
+			.catch(err => log.error('Failed to post not-found notice', { channel: 'adminOnly' }, err));
 	}
 }
 
@@ -384,7 +389,7 @@ function setGoogleApiAuth() {
 			scope: SCOPES,
 		});
 
-		console.log('Authorize this app by visiting this url:', authUrl);
+		log.info('Authorize this app by visiting this URL', { url: authUrl });
 		const rl = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout,
@@ -394,15 +399,15 @@ function setGoogleApiAuth() {
 			rl.close();
 
 			oAuth2Client.getToken(code, (err, token) => {
-				if (err) return console.error('Error while trying to retrieve access token', err);
+				if (err) return log.error('Failed to retrieve Google access token', err);
 
 				oAuth2Client.setCredentials(token);
 
 				// Store the token to disk for later program executions
 				fs.writeFile(TOKEN_PATH, JSON.stringify(token), (err) => {
-					if (err) return console.error(err);
+					if (err) return log.error('Failed to store Google token', { path: TOKEN_PATH }, err);
 
-					console.log('Token stored to', TOKEN_PATH);
+					log.info('Google token stored', { path: TOKEN_PATH });
 				});
 			});
 		});
@@ -428,7 +433,7 @@ function announceNextWeeksEvents(auth) {
 		q: config.google.eventQuery
 	},
 		(err, res) => {
-			if (err) return console.log('The API returned an error: ' + err);
+			if (err) return log.error('Google Calendar API request failed', { calendarId: config.google.calendarId }, err);
 
 			const events = res.data.items;
 
@@ -454,7 +459,7 @@ function announceNextWeeksEvents(auth) {
 
 						if (embed) {
 							channel.send(embed)
-								.catch(console.error);
+								.catch(err => log.error('Failed to announce event', { eventId: event.id }, err));
 
 							announcedEventList.push({ id: event.id });
 
@@ -466,7 +471,7 @@ function announceNextWeeksEvents(auth) {
 				if (updateAnnouncedEventsList) {
 					fs.writeFile(`${folderRoot}/announced events.json`, JSON.stringify(announcedEventList), 'utf8', (err) => {
 						if (err) {
-							console.log(err);
+							log.error('Failed to write announced events', { file: 'announced events.json' }, err);
 						}
 					});
 				}
@@ -532,9 +537,9 @@ function scheduleMidnightJobs() {
 
 					member.send(dmEmbed)
 						.then(() => member.send('invite link'))
-						.catch(console.error)
+						.catch(err => log.warn('Failed to DM member being kicked', { memberId: member.id }, err))
 						.then(() => member.kick())
-						.catch(console.error);
+						.catch(err => log.error('Failed to kick member', { memberId: member.id }, err));
 
 					kickedMembers += member + '\n';
 
@@ -550,7 +555,7 @@ function scheduleMidnightJobs() {
 			if (updateLobbyListFile) {
 				fs.writeFile(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8', (err) => {
 					if (err) {
-						console.log(err);
+						log.error('Failed to write lobby state', { file: 'lobby.json' }, err);
 					}
 				});
 			}
@@ -567,7 +572,7 @@ function scheduleMidnightJobs() {
 						.setDescription(kickedMembers);
 
 				adminOnlyChannel.send(embed)
-					.catch(console.error);
+					.catch(err => log.error('Failed to post lobby kick summary', { channel: 'adminOnly' }, err));
 			}
 		}
 
@@ -575,7 +580,7 @@ function scheduleMidnightJobs() {
 
 		addMissingSecretClubRoles();
 
-		console.log('Scheduled job ran at ' + new Date());
+		log.info('Midnight job complete');
 	});
 }
 
@@ -590,7 +595,7 @@ function closePoll(poll) {
 
 	if (channel) {
 		channel.send(embed)
-			.catch(console.error);
+			.catch(err => log.error('Failed to post poll results', { pollId: poll.id, channelId: poll.channelId }, err));
 	}
 
 	openPollList = openPollList.filter(p => p.id != poll.id);
@@ -599,7 +604,7 @@ function closePoll(poll) {
 		fs.writeFileSync(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8');
 	}
 	catch (err) {
-		console.log(err);
+		log.error('Failed to write open polls', { file: 'open polls.json' }, err);
 	}
 }
 
@@ -608,7 +613,7 @@ function schedulePollClosure(poll) {
 
 	//Close polls that expired while the bot was offline instead of scheduling a job in the past.
 	if (Number.isNaN(expiration.getTime()) || expiration.getTime() <= Date.now()) {
-		console.log(`Closing expired poll: ${poll.title}`);
+		log.info('Closing expired poll', { pollId: poll.id, title: poll.title, expirationDate: poll.expirationDate });
 
 		closePoll(poll);
 		return;
@@ -626,16 +631,22 @@ function scheduleIdleBreaker() {
 		channel = getChannel('kodamaTest'),
 		job = schedule.scheduleJob(rule, async function () {
 			channel.startTyping();
-			console.log('Typing . . .');
+			log.debug('Keep-alive typing indicator started');
 			channel.stopTyping();
-			console.log('Finished typing!');
+			log.debug('Keep-alive typing indicator finished');
 		});
 }
 
-discordClient.on('error', console.error);
+discordClient.on('error', err => log.error('Discord client error', err));
 
 discordClient.on('ready', async () => {
 	guild = discordClient.guilds.find(g => g.id === config.guildId)
+
+	if (!guild) {
+		log.error('Configured guild not found', { guildId: config.guildId });
+		process.exit(1);
+	}
+
 	discordClient.user.setPresence({
 		game: {
 			name: 'kod!help | The forest\'s little helper',
@@ -643,22 +654,22 @@ discordClient.on('ready', async () => {
 		}
 	});
 
-	console.log('Set Discord \"Playing\" status.');
+	log.info('Discord presence set', { activity: 'kod!help | The forest\'s little helper' });
 
 	await setGoogleApiAuth();
 
-	console.log('Set Google API auth.');
+	log.info('Google API authentication ready');
 
 	scheduleMidnightJobs();
 
-	console.log('Scheduled midnight jobs.');
+	log.info('Scheduled midnight jobs');
 
 	if (fs.existsSync(`${folderRoot}/open polls.json`)) {
 		const content = fs.readFileSync(`${folderRoot}/open polls.json`);
 
 		openPollList = JSON.parse(content);
 
-		console.log('Loaded \"open polls.json\".');
+		log.info('Loaded state', { file: 'open polls.json', count: openPollList.length });
 	}
 
 	if (fs.existsSync(`${folderRoot}/unfinished polls.json`)) {
@@ -666,7 +677,7 @@ discordClient.on('ready', async () => {
 
 		unfinishedPollList = JSON.parse(content);
 
-		console.log('Loaded \"unfinished polls.json\".');
+		log.info('Loaded state', { file: 'unfinished polls.json', count: unfinishedPollList.length });
 	}
 
 	if (fs.existsSync(`${folderRoot}/lobby.json`)) {
@@ -674,14 +685,14 @@ discordClient.on('ready', async () => {
 
 		lobbyList = JSON.parse(content);
 
-		console.log('Loaded \"lobby.json\".');
+		log.info('Loaded state', { file: 'lobby.json', count: lobbyList.length });
 	}
 
 	schedulePollClosures();
 
-	console.log('Scheduled poll closures.');
+	log.info('Scheduled poll closures', { openPolls: openPollList.length });
 
-	console.log('Finished startup.');
+	log.info('Startup complete', { user: discordClient.user.tag, guildId: config.guildId, guildName: guild.name });
 });
 
 discordClient.on('message', msg => {
@@ -845,6 +856,11 @@ discordClient.on('message', msg => {
 
 					const channel = guild.channels.find(ch => ch.id == poll.channelId)
 
+					if (!channel) {
+						log.error('Poll channel not found', { pollId: poll.id, channelId: poll.channelId });
+						return;
+					}
+
 					channel.send(newPollEmbed)
 						.then((newPollMessage) => {
 							poll.messageId = newPollMessage.id;
@@ -853,18 +869,26 @@ discordClient.on('message', msg => {
 
 							fs.writeFile(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8', (err) => {
 								if (err) {
-									console.log(err);
+									log.error('Failed to write open polls', { file: 'open polls.json' }, err);
 								}
 							});
 
 							poll.options.forEach(async (option) => {
 								const emoji = (option.emoji.id ? guild.emojis.get(option.emoji.id) : option.emoji.name);
 
-								await newPollMessage.react(emoji);
+								try {
+									await newPollMessage.react(emoji);
+								}
+								catch (err) {
+									log.error('Failed to add poll option reaction', { pollId: poll.id, option: option.title }, err);
+								}
 							});
 
 							schedulePollClosure(poll);
-						});
+
+							log.info('Poll opened', { pollId: poll.id, title: poll.title, channelId: poll.channelId, expiresAt: poll.expirationDate });
+						})
+						.catch(err => log.error('Failed to post poll', { pollId: poll.id, channelId: poll.channelId }, err));
 				}
 				else {
 					embed.setTitle('New Poll Set Up');
@@ -893,7 +917,8 @@ discordClient.on('message', msg => {
 							unfinishedPollList[pollListIndex] = poll;
 						}
 
-						pollMessage.edit(embed);
+						pollMessage.edit(embed)
+							.catch(err => log.error('Failed to update poll setup message', { pollId: poll.id }, err));
 					}
 					else {
 						updateUnfinishedList = false;
@@ -905,17 +930,18 @@ discordClient.on('message', msg => {
 
 								fs.writeFile(`${folderRoot}/unfinished polls.json`, JSON.stringify(unfinishedPollList), 'utf8', (err) => {
 									if (err) {
-										console.log(err);
+										log.error('Failed to write unfinished polls', { file: 'unfinished polls.json' }, err);
 									}
 								});
-							});
+							})
+							.catch(err => log.error('Failed to post poll setup message', { pollId: poll.id }, err));
 					}
 				}
 
 				if (updateUnfinishedList) {
 					fs.writeFile(`${folderRoot}/unfinished polls.json`, JSON.stringify(unfinishedPollList), 'utf8', (err) => {
 						if (err) {
-							console.log(err);
+							log.error('Failed to write unfinished polls', { file: 'unfinished polls.json' }, err);
 						}
 					});
 				}
@@ -953,14 +979,19 @@ discordClient.on('message', msg => {
 
 					setupChannel.send(embed)
 						.then((pollMessage) => {
-							unfinishedPollList.push(new Poll(member.id, new PollSetupData(setupChannel.id, pollMessage.id), (channel ? channel.id : announcementsChannel.id)));
+							const targetChannelId = (channel ? channel.id : announcementsChannel.id);
+
+							unfinishedPollList.push(new Poll(member.id, new PollSetupData(setupChannel.id, pollMessage.id), targetChannelId));
 
 							fs.writeFile(`${folderRoot}/unfinished polls.json`, JSON.stringify(unfinishedPollList), 'utf8', (err) => {
 								if (err) {
-									console.log(err);
+									log.error('Failed to write unfinished polls', { file: 'unfinished polls.json' }, err);
 								}
 							});
-						});
+
+							log.info('Poll setup started', { memberId: member.id, channelId: targetChannelId });
+						})
+						.catch(err => log.error('Failed to start poll setup', { memberId: member.id }, err));
 
 					allowCommands = false;
 				}
@@ -1008,10 +1039,12 @@ discordClient.on('message', msg => {
 							.setTitle('Hi, I\'m Kodama!')
 							.setDescription('Hello, @everyone! I\'m Kodama.\n\nI\'m a bot Naomi created to help out around the server. I don\'t do a whole lot right now, but Nae\'s adding to me little by little every day!\n\nFind out what I can do with the command \`\`\`kod!help\`\`\`');
 
-					channel.fetchMessage(config.messages.introduction).then(messageToEdit => {
-						messageToEdit.edit(embed)
-							.catch(console.error);
-					});
+					channel.fetchMessage(config.messages.introduction)
+						.then(messageToEdit => {
+							messageToEdit.edit(embed)
+								.catch(err => log.error('Failed to update introduction message', { messageId: config.messages.introduction }, err));
+						})
+						.catch(err => log.error('Failed to fetch introduction message', { messageId: config.messages.introduction }, err));
 
 					allowCommands = false;
 				}
@@ -1024,7 +1057,7 @@ discordClient.on('message', msg => {
 							.setTitle('Member Added to Lobby List!');
 
 					if (targetMember) {
-						console.log(`Found user ${username}`);
+						log.info('Adding member to lobby list', { memberId: targetMember.id, displayName: targetMember.displayName });
 
 						let expirationDate = targetMember.joinedAt;
 
@@ -1041,20 +1074,22 @@ discordClient.on('message', msg => {
 
 								fs.writeFile(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8', function (err) {
 									if (err) {
-										console.log(err);
+										log.error('Failed to write lobby state', { file: 'lobby.json' }, err);
 									}
 								});
-							});
+							})
+							.catch(err => log.error('Failed to post lobby list notice', { channel: 'kodamaTest' }, err));
 
 
 					}
 					else {
-						console.log(`Could not find user ${username}`);
+						log.warn('Could not find member for lobby list', { username: username });
 
 						embed.setTitle('Member not found!')
 							.setDescription(`Could not find user ${username}`);
 
-						channel.send(embed);
+						channel.send(embed)
+							.catch(err => log.error('Failed to post lobby list notice', { channel: 'kodamaTest' }, err));
 					}
 
 					allowCommands = false;
@@ -1067,8 +1102,7 @@ discordClient.on('message', msg => {
 						lobbyList.forEach(function (loiterer) {
 							const member = guild.members.find(m => m.id == loiterer.id);
 
-							console.log(new Date(loiterer.expirationDate));
-							console.log(new Date());
+							log.debug('Checking lobby entry', { memberId: loiterer.id, expiresAt: loiterer.expirationDate });
 
 							if (member && new Date(loiterer.expirationDate) <= new Date()) {
 								kickedMembers += member + '\n';
@@ -1087,7 +1121,7 @@ discordClient.on('message', msg => {
 						if (updateLobbyListFile) {
 							fs.writeFile(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8', (err) => {
 								if (err) {
-									console.log(err);
+									log.error('Failed to write lobby state', { file: 'lobby.json' }, err);
 								}
 							});
 						}
@@ -1100,7 +1134,7 @@ discordClient.on('message', msg => {
 									.setDescription(kickedMembers);
 
 							channel.send(embed)
-								.catch(console.error);
+								.catch(err => log.error('Failed to post lobby check result', { channel: 'kodamaTest', result: 'kicks' }, err));
 						}
 						else {
 							const channel = getChannel('kodamaTest'),
@@ -1110,7 +1144,7 @@ discordClient.on('message', msg => {
 									.setDescription(':shrug:');
 
 							channel.send(embed)
-								.catch(console.error);
+								.catch(err => log.error('Failed to post lobby check result', { channel: 'kodamaTest', result: 'none' }, err));
 						}
 					})();
 
@@ -1125,10 +1159,10 @@ discordClient.on('message', msg => {
 					embed = new RichEmbed()
 						.setTitle('Kodama Help Menu')
 						.setColor(0x1abc9c)
-						.setDescription(`${msg.member} here is a list of commands you can give me:\n\n__Command Syntax__\`\`\`@Kodama h\nkodama!h\nkod!h\`\`\`\n\nDisplay Help Menu:\`\`\`\nhelp\nh\`\`\`\n\nDisplay Server's avatar:\`\`\`\nserver-avatar\nsa\`\`\`\n\nDisplay a given user's avatar:\`\`\`avatar @user\na @user\`\`\`\n\nStart a poll:\`\`\`poll\`\`\``);
+						.setDescription(`${msg.member} here is a list of commands you can give me:\n\n__Command Syntax__\`\`\`@Kodama h\nkodama!h\nkod!h\`\`\`\n\nDisplay Help Menu:\`\`\`\nhelp\nh\`\`\`\n\nDisplay Server's avatar:\`\`\`\nserver-avatar\nsa\`\`\`\n\nDisplay a given user's avatar:\`\`\`avatar @user\na @user\`\`\`\n\nStart a poll (admins):\`\`\`\n!poll [#channel]\`\`\``);
 
 				channel.send(embed)
-					.catch(console.error);
+					.catch(err => log.error('Failed to post help menu', { channel: 'botSpam' }, err));
 			}
 			else if (command == 'server-avatar' || command == 'sa') {
 				const channel = getChannel('botSpam'),
@@ -1139,7 +1173,7 @@ discordClient.on('message', msg => {
 						.setImage(msg.guild.iconURL);
 
 				channel.send(embed)
-					.catch(console.error);
+					.catch(err => log.error('Failed to post server avatar', { channel: 'botSpam' }, err));
 			}
 			else if (command == 'avatar' || command == 'a') {
 				const channel = getChannel('botSpam'),
@@ -1155,7 +1189,7 @@ discordClient.on('message', msg => {
 						.setImage(mentionedUser.avatarURL);
 
 					channel.send(embed)
-						.catch(console.error);
+						.catch(err => log.error('Failed to post member avatar', { channel: 'botSpam', memberId: mentionedMember.id }, err));
 				}
 				else {
 					const embed = new RichEmbed()
@@ -1164,7 +1198,7 @@ discordClient.on('message', msg => {
 						.setDescription(`${msg.member}\nThe correct syntax for the command is\n\`\`\`kod!icon {user mention}\`\`\``);
 
 					channel.send(embed)
-						.catch(console.error);
+						.catch(err => log.error('Failed to post avatar syntax error', { channel: 'botSpam' }, err));
 				}
 			}
 		}
@@ -1172,6 +1206,8 @@ discordClient.on('message', msg => {
 });
 
 discordClient.on('guildMemberAdd', member => {
+	log.info('Member joined', { memberId: member.id, displayName: member.displayName });
+
 	const welcomeChannel = getChannel('welcome'),
 		theLobbyChannel = getChannel('lobby'),
 		adminOnlyChannel = getChannel('adminOnly'),
@@ -1203,9 +1239,9 @@ discordClient.on('guildMemberAdd', member => {
 				.setDescription(`Sent ${member.displayName} an introduction to the server.`);
 
 			adminOnlyChannel.send(dmConfirmEmbed)
-				.catch(console.error);
+				.catch(err => log.error('Failed to confirm welcome DM', { memberId: member.id }, err));
 		})
-		.catch(console.error);
+		.catch(err => log.warn('Failed to DM new member', { memberId: member.id }, err));
 
 	adminOnlyChannel.send(adminOnlyEmbed)
 		.then((msg) => {
@@ -1213,17 +1249,19 @@ discordClient.on('guildMemberAdd', member => {
 
 			fs.writeFile(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8', (err) => {
 				if (err) {
-					console.log(err);
+					log.error('Failed to write lobby state', { file: 'lobby.json' }, err);
 				}
 				else {
-					console.log(`Added ${member.displayName} to \"lobby.json\"\n`);
+					log.info('Added member to lobby', { memberId: member.id, displayName: member.displayName, expiresAt: expirationDate.toISOString() });
 				}
 			});
 		})
-		.catch(console.error);
+		.catch(err => log.error('Failed to post join notice', { memberId: member.id, channel: 'adminOnly' }, err));
 });
 
 discordClient.on('guildMemberRemove', member => {
+	log.info('Member left', { memberId: member.id });
+
 	let kickedList = [];
 
 	if (fs.existsSync(`${folderRoot}/kicked.json`)) {
@@ -1240,13 +1278,13 @@ discordClient.on('guildMemberRemove', member => {
 
 		fs.writeFile(`${folderRoot}/kicked.json`, JSON.stringify(kickedList), 'utf8', (err) => {
 			if (err) {
-				console.log(err);
+				log.error('Failed to write kicked state', { file: 'kicked.json' }, err);
 			}
 		});
 
 		fs.writeFile(`${folderRoot}/lobby.json`, JSON.stringify(lobbyList), 'utf8', (err) => {
 			if (err) {
-				console.log(err);
+				log.error('Failed to write lobby state', { file: 'lobby.json' }, err);
 			}
 		});
 	}
@@ -1258,7 +1296,7 @@ discordClient.on('guildMemberRemove', member => {
 				.setDescription(`${member} Left the server!`);
 
 		adminOnlyChannel.send(embed)
-			.catch(console.error);
+			.catch(err => log.error('Failed to post leave notice', { memberId: member.id, channel: 'adminOnly' }, err));
 	}
 });
 
@@ -1299,7 +1337,7 @@ discordClient.on('messageReactionAdd', async (reaction, reactionUser) => {
 
 				fs.writeFile(`${folderRoot}/unfinished polls.json`, JSON.stringify(unfinishedPollList), 'utf8', (err) => {
 					if (err) {
-						console.log(err);
+						log.error('Failed to write unfinished polls', { file: 'unfinished polls.json' }, err);
 					}
 					else {
 						reaction.message.edit(embed);
@@ -1337,7 +1375,7 @@ discordClient.on('messageReactionAdd', async (reaction, reactionUser) => {
 
 				fs.writeFile(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8', (err) => {
 					if (err) {
-						console.log(err);
+						log.error('Failed to write open polls', { file: 'open polls.json' }, err);
 					}
 				});
 			}
@@ -1352,10 +1390,10 @@ discordClient.on('messageReactionAdd', async (reaction, reactionUser) => {
 		}
 
 		if (reaction.emoji.name == "👎") {
-			console.log('Reject ' + loitererMember.displayName);
+			log.info('Lobby rejection logged', { memberId: loiterer.id, displayName: loitererMember.displayName });
 		}
 		else {
-			console.log('Admit ' + loitererMember.displayName + ' -- Reaction');
+			log.info('Member admitted by reaction', { memberId: loiterer.id, displayName: loitererMember.displayName });
 			admitMember(loitererMember);
 		}
 	}
@@ -1384,7 +1422,7 @@ discordClient.on('messageReactionRemove', async (reaction, reactionUser) => {
 
 			fs.writeFile(`${folderRoot}/open polls.json`, JSON.stringify(openPollList), 'utf8', (err) => {
 				if (err) {
-					console.log(err);
+					log.error('Failed to write open polls', { file: 'open polls.json' }, err);
 				}
 			});
 		}
@@ -1418,5 +1456,5 @@ discordClient.on('raw', packet => {
 		if (packet.t === 'MESSAGE_REACTION_REMOVE') {
 			discordClient.emit('messageReactionRemove', reaction, discordClient.users.get(packet.d.user_id));
 		}
-	}).catch(console.error);
+	}).catch(err => log.error('Failed to process raw gateway event', { event: packet.t }, err));
 });

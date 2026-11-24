@@ -67,6 +67,7 @@ The bot is a single Node process built on `discord.js` v11:
 ```
 index.js                     Discord client, event handlers, command router
 config.js                    Loads, merges, and validates config.json
+logger.js                    Dependency-free structured logger
 config.json                  Server IDs, roles, channels, calendar (not committed)
 .env                         Bot token and environment flags (not committed)
 google_credentials.json      Google OAuth client (not committed)
@@ -82,6 +83,7 @@ data/                        Runtime JSON state (not committed)
 Major pieces inside `index.js`:
 
 - **Configuration** — `config.js` merges `config.json` over defaults, validates the required values, and fails fast with a list of anything missing.
+- **Logging** — `logger.js` emits structured text or JSON lines with levels, timestamps, context, and serialized errors.
 - **Poll engine** — `Poll`, `PollOption`, and `PollSetupData` model a guided setup state machine; message handlers advance it, and `node-schedule` closes polls at their expiration.
 - **Google integration** — `setGoogleApiAuth` performs the installed-app OAuth flow and caches a token; `announceNextWeeksEvents` maps calendar entries to embeds.
 - **Lobby lifecycle** — `guildMemberAdd`/`guildMemberRemove` and the midnight job keep `lobby.json` in sync with Discord.
@@ -128,6 +130,8 @@ cp .env.example .env
 | `BOT_TOKEN` | Discord bot token. |
 | `DEV` | `true` to use a separate development state directory (`<DATA_DIR>/dev`). |
 | `DATA_DIR` | Where runtime JSON state is stored. Defaults to `./data`. |
+| `LOG_LEVEL` | Minimum level to log: `error`, `warn`, `info`, or `debug`. Defaults to `info`. |
+| `LOG_FORMAT` | `text` for human-readable lines or `json` for one object per line. Defaults to `text`. |
 
 ### 5. Configure the server
 
@@ -163,6 +167,7 @@ npm start
 - **JSON files instead of a database.** The server was small and the data was tiny; flat files kept the Pi deployment to a single process with no services to run. The trade-off is no atomic writes and no concurrency control, which is the first thing I would change.
 - **A state machine for poll setup.** Poll creation is a conversation, not a slash command: each message advances a stored `Poll` object. Modeling it explicitly kept the handler readable and made partial setups resumable.
 - **Why the raw packet handler exists.** `discord.js` v11 does not emit reaction events for messages that are not cached, which matters for pinned lobby and poll messages after a restart.
+- **Dependency-free logger.** A small local module keeps the pinned 2021 dependency stack unchanged while still supporting structured JSON output for journald on the Raspberry Pi.
 - **Placeholders, not secrets.** The credential files in this repository's history were always redacted; real values were supplied at deploy time. They are now ignored outright.
 
 ## Roadmap
