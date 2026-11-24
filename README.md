@@ -4,6 +4,7 @@
 
 ![Node.js](https://img.shields.io/badge/node-12--14-339933?logo=node.js&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-11.6.4-5865F2?logo=discord&logoColor=white)
+![CI](https://github.com/naomic-dev/Kodama/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 Kodama was the resident admin bot for a community Discord server. It ran 24/7 on a Raspberry Pi in my bedroom while the server was active, handling the server's front door: welcoming new members, verifying them out of a lobby, announcing events from a shared Google Calendar, and running polls for community decisions.
@@ -99,6 +100,10 @@ test/
   pollSetup.test.js          Guided poll setup state machine
   lobby.test.js              Lobby expiry
   fixtures/test-config.json  Test configuration
+Dockerfile                   Container image
+.dockerignore                Build context exclusions
+deploy/kodama.service        Raspberry Pi systemd unit
+.github/workflows/ci.yml     Test matrix (Node 12 and 14)
 config.json                  Server IDs, roles, channels, calendar (not committed)
 .env                         Bot token and environment flags (not committed)
 google_credentials.json      Google OAuth client (not committed)
@@ -203,6 +208,96 @@ npm test
 
 The suite uses Node's built-in `assert` and runs each file in a separate process, so it adds no dependencies. It covers the poll model, the guided setup state machine, expired-poll closure, and lobby expiry. Tests point `CONFIG_PATH` at a fixture and use a temporary `DATA_DIR`.
 
+## Deployment
+
+### Docker
+
+The image keeps the application code read-only and runs from `/app/runtime`, where the runtime files and state are mounted.
+
+Build it:
+
+```bash
+docker build -t kodama .
+```
+
+Create a runtime directory and fill in the configuration:
+
+```bash
+mkdir -p runtime/data
+cp config.example.json runtime/config.json
+cp google_credentials.example.json runtime/google_credentials.json
+printf 'BOT_TOKEN=your-bot-token-here\n' > runtime/.env
+# edit runtime/config.json and runtime/google_credentials.json
+```
+
+The container runs as uid 1000, so make the runtime directory writable by that user if your host uid differs:
+
+```bash
+sudo chown -R 1000:1000 runtime
+```
+
+Run once interactively to complete the Google OAuth flow and write `runtime/token.json`:
+
+```bash
+docker run --rm -it -v "$PWD/runtime:/app/runtime" kodama
+```
+
+Then start it detached:
+
+```bash
+docker run -d --name kodama --restart unless-stopped \
+  -v "$PWD/runtime:/app/runtime" \
+  kodama
+
+docker logs -f kodama
+```
+
+`config.json`, `google_credentials.json`, `token.json`, and `.env` are read from `/app/runtime`; state is written to `/app/runtime/data`.
+
+### Raspberry Pi (systemd)
+
+Kodama originally ran 24/7 on a Raspberry Pi. The example unit is [`deploy/kodama.service`](deploy/kodama.service).
+
+1. Install Node.js 12–14, then create the service user:
+   ```bash
+   sudo useradd --system --home /var/lib/kodama --shell /usr/sbin/nologin kodama
+   ```
+
+2. Install the code and dependencies:
+   ```bash
+   sudo git clone https://github.com/naomic-dev/Kodama.git /opt/kodama
+   cd /opt/kodama
+   sudo npm install --ignore-scripts
+   ```
+
+3. Create the runtime directory and copy the templates:
+   ```bash
+   sudo install -d -o kodama -g kodama /var/lib/kodama
+   sudo -u kodama cp /opt/kodama/config.example.json /var/lib/kodama/config.json
+   sudo -u kodama cp /opt/kodama/google_credentials.example.json /var/lib/kodama/google_credentials.json
+   sudo -u kodama sh -c 'printf "BOT_TOKEN=your-bot-token-here\n" > /var/lib/kodama/.env'
+   sudo -u kodama "${EDITOR:-vi}" /var/lib/kodama/config.json
+   sudo -u kodama "${EDITOR:-vi}" /var/lib/kodama/google_credentials.json
+   ```
+
+4. Complete the Google OAuth flow once in the foreground. If the service is already running, stop it first.
+   ```bash
+   sudo -u kodama sh -c 'cd /var/lib/kodama && CONFIG_PATH=/var/lib/kodama/config.json DATA_DIR=/var/lib/kodama/data node /opt/kodama/index.js'
+   ```
+   Visit the printed URL, paste the code back, then press Ctrl+C once `token.json` has been written.
+
+5. Install and start the unit:
+   ```bash
+   sudo cp /opt/kodama/deploy/kodama.service /etc/systemd/system/kodama.service
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now kodama
+   sudo journalctl -u kodama -f
+   ```
+
+The unit reads `.env` from `/var/lib/kodama/.env`, expects `config.json` and the Google credentials in `/var/lib/kodama`, and writes state to `/var/lib/kodama/data`. If Node is installed via nvm rather than the system package manager, replace `/usr/bin/env node` in the unit with the absolute path to your Node binary.
+
+Set `LOG_FORMAT=json` in `.env` to emit one JSON object per line for journald.
+
 ## Design notes
 
 - **JSON files instead of a database.** The server was small and the data was tiny; flat files kept the Pi deployment to a single process with no services to run. The trade-off is no atomic writes and no concurrency control, which is the first thing I would change.
@@ -218,7 +313,6 @@ This is a faithful snapshot, not a maintained product. If I picked it up again:
 - [ ] Migrate to `discord.js` v14 with intents and slash commands.
 - [ ] Replace JSON persistence with SQLite and transaction-safe writes.
 - [ ] Replace `console.log` with structured logging.
-- [ ] Add a Dockerfile and document the Raspberry Pi service unit.
 - [ ] Add screenshots and a short demo recording.
 
 ## License

@@ -1,0 +1,28 @@
+[Unit]
+Description=Kodama Discord bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kodama
+Group=kodama
+WorkingDirectory=/var/lib/kodama
+ExecStart=/usr/bin/env node /opt/kodama/index.js
+Restart=on-failure
+RestartSec=5
+
+Environment=NODE_ENV=production
+Environment=CONFIG_PATH=/var/lib/kodama/config.json
+Environment=DATA_DIR=/var/lib/kodama/data
+EnvironmentFile=-/var/lib/kodama/.env
+
+StateDirectory=kodama
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/kodama
+
+[Install]
+WantedBy=multi-user.target

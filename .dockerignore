@@ -1,0 +1,11 @@
+.git
+.github
+node_modules
+data
+runtime
+test
+.env
+config.json
+google_credentials.json
+token.json
+npm-debug.log*
