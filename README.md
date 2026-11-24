@@ -1,6 +1,170 @@
 # Kodama
-Kodama is an administrative chat bot for Discord.
 
-It has the ability to automatically welcome new users, direct them to server rules, kick inactive users, announce events pulled from a Google calendar, build and run polls, assign and remove roles, and execute a few other specific commands. When the server it was made for was active, I had Kodama running 24/7 on a RaspberryPi in my bedroom.
+> An administrative Discord bot for a community server — onboarding, lobby moderation, polls, and event announcements.
 
-This version has had a lot of code related to the specific server it was intended for removed. As such, it is untested, and I make no promises that it will work as-is. You're free to use it for reference in a similar project, however.
+![Node.js](https://img.shields.io/badge/node-12--14-339933?logo=node.js&logoColor=white)
+![discord.js](https://img.shields.io/badge/discord.js-11.6.4-5865F2?logo=discord&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
+Kodama was the resident admin bot for a community Discord server. It ran 24/7 on a Raspberry Pi in my bedroom while the server was active, handling the server's front door: welcoming new members, verifying them out of a lobby, announcing events from a shared Google Calendar, and running polls for community decisions.
+
+This repository is a **reference snapshot**. Server-specific IDs, channel names, and event copy have been replaced with placeholders, so it will not run until you supply your own configuration. See [Setup](#setup).
+
+## Features
+
+### Onboarding and the lobby
+
+- DMs every new member a rules summary and a "how to get verified" walkthrough.
+- Posts a welcome message to the introductions channel and a notification to the admin channel.
+- Tracks new members in a 7-day lobby window; a midnight job kicks anyone who has not introduced themselves and DMs them a fresh invite.
+- Admins verify members with a single reaction on the lobby message (or the `!admit` command), which assigns roles and clears the lobby entry.
+
+### Polls
+
+- Guided, stateful poll setup in an admin channel: title → description → duration → exclusive vs. multi-choice → options, each with an emoji.
+- Options can use server custom emojis; single-choice polls automatically retract previous votes.
+- Polls close on schedule and post a final tally.
+- In-progress and open polls survive restarts (JSON-backed).
+
+### Events
+
+- Pulls the next seven days of events from a Google Calendar.
+- Parses lightweight metadata out of the calendar description (`[type:...]`, `[url:...]`, `[title note:...]`, `[desc note:...]`) to build branded embeds per event type.
+- Announces each event once, de-duplicated across restarts.
+
+### Utility and moderation
+
+- Help, server avatar, and member avatar commands.
+- Owner-only broadcast, event re-announcement, and lobby-inspection commands.
+- Role backfill for vetted member groups.
+- Forwards DMs sent to the bot into the admin channel, including attachments.
+
+## Commands
+
+Commands can be prefixed with `@Kodama`, `kodama!`, or `kod!`.
+
+| Command | Scope | Description |
+| --- | --- | --- |
+| `help`, `h` | Members | Show the help menu. |
+| `server-avatar`, `sa` | Members | Post the server's icon. |
+| `avatar @user`, `a @user` | Members | Post a member's avatar. |
+| `!admit @user` | Admin | Verify a member and assign roles. |
+| `!poll [#channel]` | Admin | Start guided poll setup. |
+| `!say #channel <text>` | Owner | Post an embed as the bot. |
+| `!ping` | Owner | Health check. |
+| `!announce-events` | Owner | Re-run the calendar announcement job. |
+| `!event-tag-format` | Owner | Show calendar description tag syntax. |
+| `!update-introduction` | Owner | Refresh the pinned introduction message. |
+| `!add-to-lobby-list <name>` | Owner | Manually add a member to the lobby list. |
+| `!check-lobby-list` | Owner | Dry-run the lobby expiry check. |
+
+Reacting to a lobby entry with any emoji verifies that member; 👎 is logged as a rejection.
+
+## Architecture
+
+The bot is a single Node process built on `discord.js` v11:
+
+```
+index.js                     Discord client, event handlers, command router
+.env                         Bot token and environment flags (not committed)
+sheets_credentials.json      Google OAuth client (not committed)
+token.json                   Google OAuth token, generated on first run (not committed)
+data/                        Runtime JSON state (not committed)
+  lobby.json                 Pending members and expiry dates
+  open polls.json            Live polls and vote state
+  unfinished polls.json      In-progress poll setup sessions
+  announced events.json      Event IDs already announced
+  kicked.json                Members removed by the lobby job
+```
+
+Major pieces inside `index.js`:
+
+- **Poll engine** — `Poll`, `PollOption`, and `PollSetupData` model a guided setup state machine; message handlers advance it, and `node-schedule` closes polls at their expiration.
+- **Google integration** — `setGoogleApiAuth` performs the installed-app OAuth flow and caches a token; `announceNextWeeksEvents` maps calendar entries to embeds.
+- **Lobby lifecycle** — `guildMemberAdd`/`guildMemberRemove` and the midnight job keep `lobby.json` in sync with Discord.
+- **Scheduling** — `node-schedule` runs midnight maintenance, poll closures, and a keep-alive typing job.
+- **Raw reaction handler** — a `raw` packet listener re-fetches uncached messages so reactions work on older messages.
+
+## Requirements
+
+- Node.js 12–14 (this snapshot targets `discord.js` v11, whose native dependencies do not build on newer Node releases; see the [roadmap](#roadmap))
+- A Discord application and bot token
+- A Google Cloud project with the **Calendar** and **Sheets** APIs enabled and a Desktop OAuth client
+
+## Setup
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Create the Discord bot
+
+Create an application at <https://discord.com/developers/applications>, add a bot, and copy its token. Invite it to your server with the permissions it needs (manage roles, kick members, send messages, read message history).
+
+### 3. Create Google credentials
+
+In Google Cloud Console, enable the Calendar and Sheets APIs, create an OAuth client of type **Desktop app**, and download the JSON. Save it as `sheets_credentials.json`:
+
+```bash
+cp sheets_credentials.example.json sheets_credentials.json
+# then paste in your client_id, client_secret, and project_id
+```
+
+On first run Kodama prints an authorization URL. Visit it, paste the code back into the terminal, and it writes `token.json` for subsequent runs.
+
+### 4. Configure the environment
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Description |
+| --- | --- |
+| `BOT_TOKEN` | Discord bot token. |
+| `DEV` | `true` to use a separate development state directory (`<DATA_DIR>/dev`). |
+| `DATA_DIR` | Where runtime JSON state is stored. Defaults to `./data`. |
+
+### 5. Replace the server placeholders
+
+This snapshot has the original server's identifiers removed. Search `index.js` for `redacted` and replace each one with your own value:
+
+| Placeholder | What it is |
+| --- | --- |
+| Guild ID | Target server ID. |
+| Role IDs | Member, admin, vetted, and "secret club" roles. |
+| Channel names | `admin-only`, `announcements`, `welcome`, `the-lobby`, and others. |
+| Message IDs | Pinned introduction message and role menus. |
+| Calendar ID / query | Calendar to read and the event title filter. |
+| Spreadsheet ID | Member roster sheet (currently unused; see the roadmap). |
+
+### 6. Run
+
+```bash
+npm start
+```
+
+## Design notes
+
+- **JSON files instead of a database.** The server was small and the data was tiny; flat files kept the Pi deployment to a single process with no services to run. The trade-off is no atomic writes and no concurrency control, which is the first thing I would change.
+- **A state machine for poll setup.** Poll creation is a conversation, not a slash command: each message advances a stored `Poll` object. Modeling it explicitly kept the handler readable and made partial setups resumable.
+- **Why the raw packet handler exists.** `discord.js` v11 does not emit reaction events for messages that are not cached, which matters for pinned lobby and poll messages after a restart.
+- **Placeholders, not secrets.** The credential files in this repository's history were always redacted; real values were supplied at deploy time. They are now ignored outright.
+
+## Roadmap
+
+This is a faithful snapshot, not a maintained product. If I picked it up again:
+
+- [ ] Migrate to `discord.js` v14 with intents and slash commands.
+- [ ] Extract configuration (guild, roles, channels, calendar) into a single config module.
+- [ ] Split `index.js` into `commands/`, `events/`, `services/`, and `models/`.
+- [ ] Replace JSON persistence with SQLite and transaction-safe writes.
+- [ ] Add unit tests for the poll state machine and lobby expiry logic.
+- [ ] Replace `console.log` with structured logging.
+- [ ] Add a Dockerfile and document the Raspberry Pi service unit.
+- [ ] Add screenshots and a short demo recording.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

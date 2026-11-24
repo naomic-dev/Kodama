@@ -2,6 +2,7 @@ require('dotenv').config();
 const { Client, RichEmbed } = require('discord.js');
 const discordClient = new Client();
 const fs = require('fs');
+const path = require('path');
 const schedule = require('node-schedule');
 const uuid = require('uuid/v1');
 
@@ -23,11 +24,17 @@ let lobbyList = [];
 //An array of objects that maps user names to Discord IDs
 let nameDiscordIdMappings = [];
 
+const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
+
 const folderRoot = (process.env.DEV == "true" ?
-	'/root/Documents/kodama/kodama data (dev)/' :
-	'/root/Documents/kodama/kodama data/');
+	path.join(dataDir, 'dev') :
+	dataDir);
+
+// Ensure the state directory exists before any read or write.
+fs.mkdirSync(folderRoot, { recursive: true });
 
 console.log('DEV: ' + process.env.DEV);
+console.log('Data directory: ' + folderRoot);
 
 discordClient.login(process.env.BOT_TOKEN);
 
@@ -356,14 +363,18 @@ function newEventEmbed(event) {
 }
 
 function setGoogleApiAuth() {
+	if (!fs.existsSync('sheets_credentials.json')) {
+		throw new Error(
+			'Missing sheets_credentials.json. Copy sheets_credentials.example.json and add your Google OAuth client credentials.'
+		);
+	}
+
 	const content = fs.readFileSync('sheets_credentials.json');
 	const credentials = JSON.parse(content);
 	const { client_secret, client_id, redirect_uris } = credentials.installed;
 	oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
 
-	token = fs.readFileSync(TOKEN_PATH);
-
-	if (!token) {
+	if (!fs.existsSync(TOKEN_PATH)) {
 		const authUrl = oAuth2Client.generateAuthUrl({
 			access_type: 'offline',
 			scope: SCOPES,
@@ -389,11 +400,13 @@ function setGoogleApiAuth() {
 
 					console.log('Token stored to', TOKEN_PATH);
 				});
-
-				return;
 			});
 		});
+
+		return;
 	}
+
+	const token = fs.readFileSync(TOKEN_PATH);
 
 	oAuth2Client.setCredentials(JSON.parse(token));
 }
@@ -677,8 +690,6 @@ discordClient.on('ready', async () => {
 	scheduleMidnightJobs();
 
 	console.log('Scheduled midnight jobs.');
-
-	console.log(folderRoot);
 
 	if (fs.existsSync(`${folderRoot}/open polls.json`)) {
 		const content = fs.readFileSync(`${folderRoot}/open polls.json`);
