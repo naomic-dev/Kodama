@@ -19,6 +19,9 @@ token.json
 data/
 *.log
 
+# Local configuration
+config.json
+
 # OS and editor files
 .DS_Store
 Thumbs.db

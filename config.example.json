@@ -1,0 +1,43 @@
+{
+  "guildId": "YOUR_GUILD_ID",
+  "ownerId": "YOUR_USER_ID",
+  "roles": {
+    "admin": "YOUR_ADMIN_ROLE_ID",
+    "member": "YOUR_MEMBER_ROLE_ID",
+    "dmsClosed": "YOUR_DMS_CLOSED_ROLE_ID",
+    "vetted": "YOUR_VETTED_ROLE_ID",
+    "secretClub": "YOUR_SECRET_CLUB_ROLE_ID",
+    "secretClubVetted": "YOUR_SECRET_CLUB_VETTED_ROLE_ID",
+    "admitted": [
+      "YOUR_ADMITTED_ROLE_ID"
+    ]
+  },
+  "channels": {
+    "adminOnly": "admin-only",
+    "announcements": "announcements",
+    "botSpam": "bot-spam",
+    "infoAndFaq": "info-and-faq",
+    "introductions": "introductions",
+    "kodamaTest": "kodama-test",
+    "rules": "rules",
+    "selfAssignRoles": "self-assign-roles",
+    "lobby": "the-lobby",
+    "welcome": "welcome"
+  },
+  "messages": {
+    "introduction": "YOUR_MESSAGE_ID"
+  },
+  "google": {
+    "calendarId": "YOUR_CALENDAR_ID",
+    "eventQuery": "",
+    "spreadsheetId": ""
+  },
+  "eventImages": {
+    "mainMunch": "",
+    "billiards": "",
+    "billiardsDiscussion": "",
+    "wlgbtBrunch": "",
+    "wlgbtEvening": "",
+    "crafts": ""
+  }
+}

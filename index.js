@@ -1,4 +1,5 @@
 require('dotenv').config();
+const config = require('./config');
 const { Client, RichEmbed } = require('discord.js');
 const discordClient = new Client();
 const fs = require('fs');
@@ -23,6 +24,28 @@ let lobbyList = [];
 
 //An array of objects that maps user names to Discord IDs
 let nameDiscordIdMappings = [];
+
+//Look up a configured channel by name or ID
+function getChannel(key) {
+	const nameOrId = config.channels[key];
+
+	return guild.channels.find(ch => ch.name === nameOrId || ch.id === nameOrId);
+}
+
+const EVENT_IMAGE_KEYS = {
+	'main munch': 'mainMunch',
+	'billiards': 'billiards',
+	'billiards discussion': 'billiardsDiscussion',
+	'wlgbt brunch': 'wlgbtBrunch',
+	'wlgbt evening': 'wlgbtEvening',
+	'crafts': 'crafts'
+};
+
+const EVENT_TAG_FORMAT_HELP = [
+	'Add these tags to the calendar event description:',
+	'[type:<event type>] — one of: main munch, billiards, billiards discussion, wlgbt brunch, wlgbt evening, crafts',
+	'[url:<rsvp url>] — link shown in the RSVP field'
+].join('\n');
 
 const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
 
@@ -151,17 +174,17 @@ class OptionEmoji {
 }
 
 function admitMember(targetMember) {
-	const adminOnlyChannel = guild.channels.find(ch => ch.name === 'admin-only'),
+	const adminOnlyChannel = getChannel('adminOnly'),
 		adminOnlyEmbed = new RichEmbed()
 			.setColor(0x1abc9c);
 
 	if (targetMember) {
-		const introductionsChannel = guild.channels.find(ch => ch.name === 'introductions'),
-			rulesChannel = guild.channels.find(ch => ch.name === 'rules'),
-			selfAssignRolesChannel = guild.channels.find(ch => ch.name === 'self-assign-roles'),
-			infoAndFaqChannel = guild.channels.find(ch => ch.name === 'info-and-faq');
+		const introductionsChannel = getChannel('introductions'),
+			rulesChannel = getChannel('rules'),
+			selfAssignRolesChannel = getChannel('selfAssignRoles'),
+			infoAndFaqChannel = getChannel('infoAndFaq');
 
-		targetMember.addRoles(['member_role_id', 'dms_closed_role_id'])
+		targetMember.addRoles([config.roles.member, config.roles.dmsClosed])
 
 		adminOnlyEmbed.setTitle('A member has been admitted!');
 
@@ -297,8 +320,7 @@ function newEventEmbed(event) {
 				.addField('Location', 'Visit our event page to get the address!')
 				.addField('Eligible Members', 'Everyone!')
 				.addField('Cost', '$2 donation and individual checks (please be sure to support our venue and waitstaff)')
-				.addField('Dress Code', 'Something nice or dress to impress!')
-				.setImage('redacted');
+				.addField('Dress Code', 'Something nice or dress to impress!');
 		}
 		else if (type.toLowerCase() == 'billiards') {
 			embed.setTitle('The Hidden Speakeasy Relaxed Meet')
@@ -307,8 +329,7 @@ function newEventEmbed(event) {
 				.addField('Location', 'Visit our event page to get the address!')
 				.addField('Eligible Members', 'Everyone!')
 				.addField('Cost', '$2 donation, $10 event cost')
-				.addField('Dress Code', 'Nice casual or dress to impress!')
-				.setImage('redacted');
+				.addField('Dress Code', 'Nice casual or dress to impress!');
 		}
 		else if (type.toLowerCase() == 'billiards discussion') {
 			embed.setTitle('Discussion Group')
@@ -317,8 +338,7 @@ function newEventEmbed(event) {
 				.addField('Location', 'Visit our event page to get the address!')
 				.addField('Eligible Members', 'Everyone!')
 				.addField('Cost', '$5 event cost, $2 optional donation')
-				.addField('Dress Code', 'Casual or dress to impress!')
-				.setImage('redacted');
+				.addField('Dress Code', 'Casual or dress to impress!');
 		}
 		else if (type.toLowerCase() == 'wlgbt brunch') {
 			embed.setTitle('Women\'s and LGBT+ Sunday Brunch Munch :gay_pride_flag:')
@@ -327,8 +347,7 @@ function newEventEmbed(event) {
 				.addField('Location', 'Visit our event page to get the address!')
 				.addField('Eligible Members', 'Women and members of the LGBT+ Community only!')
 				.addField('Cost', '$2 donation and individual checks (please be sure to support our venue and waitstaff)')
-				.addField('Dress Code', 'Casual or dress to impress!')
-				.setImage('redacted');
+				.addField('Dress Code', 'Casual or dress to impress!');
 		}
 		else if (type.toLowerCase() == 'wlgbt evening') {
 			embed.setTitle('Women\'s and LGBT+ Evening Munch :gay_pride_flag:')
@@ -337,8 +356,7 @@ function newEventEmbed(event) {
 				.addField('Location', 'Visit our event page to get the address!')
 				.addField('Eligible Members', 'Women and members of the LGBT+ Community only!')
 				.addField('Cost', '$2 donation and individual checks (please be sure to support our venue and waitstaff)')
-				.addField('Dress Code', 'Casual or dress to impress!')
-				.setImage('redacted');
+				.addField('Dress Code', 'Casual or dress to impress!');
 		}
 		else if (type.toLowerCase() == 'crafts') {
 			embed.setTitle('Daytime Crafts and Potluck')
@@ -347,11 +365,16 @@ function newEventEmbed(event) {
 				.addField('Location', 'Visit our event page to get the address!')
 				.addField('Eligible Members', 'Everyone!')
 				.addField('Cost', '$15')
-				.addField('Dress Code', 'Casual or dress to impress!')
-				.setImage('redacted');
+				.addField('Dress Code', 'Casual or dress to impress!');
 		}
 		else {
 			return null;
+		}
+
+		const imageKey = EVENT_IMAGE_KEYS[type.toLowerCase()];
+
+		if (imageKey && config.eventImages[imageKey]) {
+			embed.setImage(config.eventImages[imageKey]);
 		}
 
 		embed.addField('Don\'t forget to RSVP!', url);
@@ -419,7 +442,7 @@ function readUsersFromSheets(auth) {
 	const sheets = google.sheets({ version: 'v4', auth });
 
 	sheets.spreadsheets.values.get({
-		spreadsheetId: '',
+		spreadsheetId: config.google.spreadsheetId,
 		range: 'Users!A2:D',
 	},
 		(err, res) => {
@@ -450,13 +473,13 @@ function getNextEvent(auth) {
 		date = new Date();
 
 	calendar.events.list({
-		calendarId: 'redacted',
+		calendarId: config.google.calendarId,
 		timeMin: date.toISOString(),
 		timeMax: (new Date(date.setTime(date.getTime() + 7 * 86400000))).toISOString(),
 		maxResults: 1,
 		singleEvents: true,
 		orderBy: 'startTime',
-		q: 'redacted'
+		q: config.google.eventQuery
 	},
 		(err, res) => {
 			if (err) return console.log('The API returned an error: ' + err);
@@ -471,17 +494,17 @@ function getNextEvent(auth) {
 		});
 }
 
-function announceNextWeeksEvents(auth, channelName = 'announcements') {
+function announceNextWeeksEvents(auth) {
 	const calendar = google.calendar({ version: 'v3', auth }),
 		date = new Date();
 
 	calendar.events.list({
-		calendarId: 'redacted',
+		calendarId: config.google.calendarId,
 		timeMin: date.toISOString(),
 		timeMax: (new Date(date.setTime(date.getTime() + 7 * 86400000))).toISOString(),
 		singleEvents: true,
 		orderBy: 'startTime',
-		q: 'redacted'
+		q: config.google.eventQuery
 	},
 		(err, res) => {
 			if (err) return console.log('The API returned an error: ' + err);
@@ -489,7 +512,7 @@ function announceNextWeeksEvents(auth, channelName = 'announcements') {
 			const events = res.data.items;
 
 			if (events.length) {
-				const channel = guild.channels.find(ch => ch.name === channelName);
+				const channel = getChannel('announcements');
 
 				let announcedEventList = [],
 					updateAnnouncedEventsList = false;
@@ -531,15 +554,11 @@ function announceNextWeeksEvents(auth, channelName = 'announcements') {
 }
 
 function addMissingSecretClubRoles() {
-	const memberRoleId = 'redacted',
-		secretClubRoleId = 'redacted',
-		vettedRoleId = 'redacted',
-		secretClubVettedRoleId = 'redacted',
-		admittedRoles = [
-			'redacted',
-			'redacted',
-			'redacted'
-		];
+	const memberRoleId = config.roles.member,
+		secretClubRoleId = config.roles.secretClub,
+		vettedRoleId = config.roles.vetted,
+		secretClubVettedRoleId = config.roles.secretClubVetted,
+		admittedRoles = config.roles.admitted;
 
 	guild.members.filter(m => m.roles.find(r => r.id == memberRoleId)).forEach((member) => {
 		if (member.roles.some(r => admittedRoles.includes(r.id))) {
@@ -575,7 +594,7 @@ function scheduleMidnightJobs() {
 			lobbyList.forEach(function (loiterer) {
 				const member = guild.members.find(m => m.id == loiterer.id);
 
-				if (member && member.roles.get('redacted') == null && new Date(loiterer.expirationDate) <= new Date()) {
+				if (member && member.roles.get(config.roles.admin) == null && new Date(loiterer.expirationDate) <= new Date()) {
 					let kickedList = [];
 
 					if (fs.existsSync(`${folderRoot}/kicked.json`)) {
@@ -612,7 +631,7 @@ function scheduleMidnightJobs() {
 			}
 
 			if (kickedMembers != '') {
-				const adminOnlyChannel = guild.channels.find(ch => ch.name === 'admin-only'),
+				const adminOnlyChannel = getChannel('adminOnly'),
 					embed = new RichEmbed()
 						.setTitle('The following members were kicked from the lobby!')
 						.setColor(0x1abc9c)
@@ -661,7 +680,7 @@ function schedulePollClosures() {
 
 function scheduleIdleBreaker() {
 	const rule = new schedule.RecurrenceRule(null, null, null, null, null, 0, 0),
-		channel = guild.channels.find(ch => ch.name === 'kodama-test'),
+		channel = getChannel('kodamaTest'),
 		job = schedule.scheduleJob(rule, async function () {
 			channel.startTyping();
 			console.log('Typing . . .');
@@ -673,7 +692,7 @@ function scheduleIdleBreaker() {
 discordClient.on('error', console.error);
 
 discordClient.on('ready', async () => {
-	guild = discordClient.guilds.find(g => g.id === 'redacted')
+	guild = discordClient.guilds.find(g => g.id === config.guildId)
 	discordClient.user.setPresence({
 		game: {
 			name: 'kod!help | The forest\'s little helper',
@@ -727,7 +746,7 @@ discordClient.on('message', msg => {
 		contentToLowerCase = msg.content.toLowerCase();
 
 	if (msg.channel.type == 'dm' && msg.author.id != discordClient.user.id) {
-		const channel = guild.channels.find(ch => ch.name == 'admin-only')
+		const channel = getChannel('adminOnly')
 		embed = new RichEmbed()
 			.setColor(0x1abc9c)
 			.setTitle(`${msg.author.username} sent Kodama a DM`);
@@ -756,7 +775,7 @@ discordClient.on('message', msg => {
 		command = '',
 			messageBody = '';
 
-		if (msg.content.startsWith('<@!redacted>')) {
+		if (msg.content.startsWith(`<@!${discordClient.user.id}>`)) {
 			if (msg.content.includes(' ')) {
 				messageBody = msg.content.substr(msg.content.indexOf(' ') + 1);
 
@@ -784,7 +803,7 @@ discordClient.on('message', msg => {
 			}
 		}
 
-		if (member && member.roles.get('redacted')) {
+		if (member && member.roles.get(config.roles.admin)) {
 			const poll = (unfinishedPollList.length > 0 ? unfinishedPollList.find(p => p.memberId == member.id) : null);
 
 			if (poll) {
@@ -980,7 +999,7 @@ discordClient.on('message', msg => {
 			}
 		}
 
-		if (member && member.roles.get('redacted')) {
+		if (member && member.roles.get(config.roles.admin)) {
 			if (allowCommands) {
 				if (msg.content.toLowerCase().startsWith('!admit')) {
 					const targetUser = msg.mentions.users.first();
@@ -1001,8 +1020,8 @@ discordClient.on('message', msg => {
 					allowCommands = false;
 				}
 				else if (msg.content.toLowerCase().startsWith('!poll')) {
-					const setupChannel = guild.channels.find(ch => ch.name === 'admin-only'),
-						announcementsChannel = guild.channels.find(ch => ch.name === 'announcements'),
+					const setupChannel = getChannel('adminOnly'),
+						announcementsChannel = getChannel('announcements'),
 						channel = msg.mentions.channels.first(),
 						embed = new RichEmbed()
 							.setColor(0x1abc9c)
@@ -1022,7 +1041,7 @@ discordClient.on('message', msg => {
 
 					allowCommands = false;
 				}
-				else if (member.id == 'redacted' && msg.content.toLowerCase().startsWith('!say')) {
+				else if (member.id == config.ownerId && msg.content.toLowerCase().startsWith('!say')) {
 					const channel = msg.mentions.channels.first(),
 						kodamaMessage = msg.content.substring(msg.content.indexOf(' ', msg.content.indexOf(' ') + 1) + 1).trim(),
 						embed = new RichEmbed()
@@ -1033,8 +1052,8 @@ discordClient.on('message', msg => {
 
 					allowCommands = false;
 				}
-				else if (member.id == 'redacted' && msg.content.toLowerCase() == '!ping') {
-					const channel = guild.channels.find(ch => ch.name === 'kodama-test'),
+				else if (member.id == config.ownerId && msg.content.toLowerCase() == '!ping') {
+					const channel = getChannel('kodamaTest'),
 						embed = new RichEmbed()
 							.setColor(0x1abc9c)
 							.setDescription('Pong!');
@@ -1043,38 +1062,38 @@ discordClient.on('message', msg => {
 
 					allowCommands = false;
 				}
-				else if (member.id == 'redacted' && msg.content.toLowerCase().startsWith('!announce-events')) {
+				else if (member.id == config.ownerId && msg.content.toLowerCase().startsWith('!announce-events')) {
 					announceNextWeeksEvents(oAuth2Client);
 
 					allowCommands = false;
 				}
-				else if (member.id == 'redacted' && msg.content.toLowerCase() == '!event-tag-format') {
-					const channel = guild.channels.find(ch => ch.name === 'kodama-test'),
+				else if (member.id == config.ownerId && msg.content.toLowerCase() == '!event-tag-format') {
+					const channel = getChannel('kodamaTest'),
 						embed = new RichEmbed()
 							.setColor(0x1abc9c)
 							.setTitle('Event Tag Format for Google Calendar')
-							.setDescription('redacted');
+							.setDescription(EVENT_TAG_FORMAT_HELP);
 
 					channel.send(embed);
 
 					allowCommands = false;
 				}
-				else if (member.id == 'redacted' && msg.content.toLowerCase() == '!update-introduction') {
-					const channel = guild.channels.find(ch => ch.name === 'announcements'),
+				else if (member.id == config.ownerId && msg.content.toLowerCase() == '!update-introduction') {
+					const channel = getChannel('announcements'),
 						embed = new RichEmbed()
 							.setColor(0x1abc9c)
 							.setTitle('Hi, I\'m Kodama!')
 							.setDescription('Hello, @everyone! I\'m Kodama.\n\nI\'m a bot Naomi created to help out around the server. I don\'t do a whole lot right now, but Nae\'s adding to me little by little every day!\n\nFind out what I can do with the command \`\`\`kod!help\`\`\`');
 
-					channel.fetchMessage('redacted').then(messageToEdit => {
+					channel.fetchMessage(config.messages.introduction).then(messageToEdit => {
 						messageToEdit.edit(embed)
 							.catch(console.error);
 					});
 
 					allowCommands = false;
 				}
-				else if (member.id == 'redacted' && msg.content.toLowerCase().startsWith('!add-to-lobby-list') && msg.content.includes(' ')) {
-					const channel = guild.channels.find(ch => ch.name === 'kodama-test'),
+				else if (member.id == config.ownerId && msg.content.toLowerCase().startsWith('!add-to-lobby-list') && msg.content.includes(' ')) {
+					const channel = getChannel('kodamaTest'),
 						username = msg.content.substr(msg.content.indexOf(' ') + 1).trim(),
 						targetMember = guild.members.find(m => m.displayName == username),
 						embed = new RichEmbed()
@@ -1117,7 +1136,7 @@ discordClient.on('message', msg => {
 
 					allowCommands = false;
 				}
-				else if (member.id == 'redacted' && msg.content.toLowerCase() == '!check-lobby-list') {
+				else if (member.id == config.ownerId && msg.content.toLowerCase() == '!check-lobby-list') {
 					(async function () {
 						let updateLobbyListFile = false,
 							kickedMembers = '';
@@ -1151,7 +1170,7 @@ discordClient.on('message', msg => {
 						}
 
 						if (kickedMembers != '') {
-							const channel = guild.channels.find(ch => ch.name === 'kodama-test'),
+							const channel = getChannel('kodamaTest'),
 								embed = new RichEmbed()
 									.setTitle('The following members should be kicked from the lobby!')
 									.setColor(0x1abc9c)
@@ -1161,7 +1180,7 @@ discordClient.on('message', msg => {
 								.catch(console.error);
 						}
 						else {
-							const channel = guild.channels.find(ch => ch.name === 'kodama-test'),
+							const channel = getChannel('kodamaTest'),
 								embed = new RichEmbed()
 									.setTitle('No one to kick from the lobby!')
 									.setColor(0x1abc9c)
@@ -1177,9 +1196,9 @@ discordClient.on('message', msg => {
 			}
 		}
 
-		if (allowCommands && command != '' && member && member.roles.get('redacted')) {
+		if (allowCommands && command != '' && member && member.roles.get(config.roles.admin)) {
 			if (command == 'help' || command == 'h') {
-				const channel = guild.channels.find(ch => ch.name === 'bot-spam'),
+				const channel = getChannel('botSpam'),
 					embed = new RichEmbed()
 						.setTitle('Kodama Help Menu')
 						.setColor(0x1abc9c)
@@ -1189,18 +1208,18 @@ discordClient.on('message', msg => {
 					.catch(console.error);
 			}
 			else if (command == 'server-avatar' || command == 'sa') {
-				const channel = guild.channels.find(ch => ch.name === 'bot-spam'),
+				const channel = getChannel('botSpam'),
 					embed = new RichEmbed()
 						.setTitle('Server Avatar')
 						.setColor(0x1abc9c)
 						.setDescription(msg.member)
-						.setImage('redacted');
+						.setImage(msg.guild.iconURL);
 
 				channel.send(embed)
 					.catch(console.error);
 			}
 			else if (command == 'avatar' || command == 'a') {
-				const channel = guild.channels.find(ch => ch.name === 'bot-spam'),
+				const channel = getChannel('botSpam'),
 					mentions = msg.mentions,
 					mentionedUser = mentions.users.filter(u => u.id != discordClient.user.id).first();
 
@@ -1228,7 +1247,7 @@ discordClient.on('message', msg => {
 			else if (command == 'poll') {
 				return;
 
-				const channel = guild.channels.find(ch => ch.name === 'bot-spam'),
+				const channel = getChannel('botSpam'),
 					embed = new RichEmbed()
 						.setColor(0x1abc9c)
 						.setTitle('New Poll Set Up')
@@ -1250,9 +1269,9 @@ discordClient.on('message', msg => {
 });
 
 discordClient.on('guildMemberAdd', member => {
-	const welcomeChannel = guild.channels.find(ch => ch.name === 'welcome'),
-		theLobbyChannel = guild.channels.find(ch => ch.name === 'the-lobby'),
-		adminOnlyChannel = guild.channels.find(ch => ch.name === 'admin-only'),
+	const welcomeChannel = getChannel('welcome'),
+		theLobbyChannel = getChannel('lobby'),
+		adminOnlyChannel = getChannel('adminOnly'),
 		dmEmbed = new RichEmbed()
 			.setTitle('Welcome to our server!')
 			.setColor(0x1abc9c)
@@ -1321,7 +1340,7 @@ discordClient.on('guildMemberRemove', member => {
 		});
 	}
 	else {
-		const adminOnlyChannel = guild.channels.find(ch => ch.name === 'admin-only'),
+		const adminOnlyChannel = getChannel('adminOnly'),
 			embed = new RichEmbed()
 				.setTitle('A member left!')
 				.setColor(0x1abc9c)

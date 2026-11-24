@@ -8,7 +8,7 @@
 
 Kodama was the resident admin bot for a community Discord server. It ran 24/7 on a Raspberry Pi in my bedroom while the server was active, handling the server's front door: welcoming new members, verifying them out of a lobby, announcing events from a shared Google Calendar, and running polls for community decisions.
 
-This repository is a **reference snapshot**. Server-specific IDs, channel names, and event copy have been replaced with placeholders, so it will not run until you supply your own configuration. See [Setup](#setup).
+This repository is a **reference snapshot**. Server-specific IDs, channel names, and calendar details live in `config.json`; the values in the repository are placeholders, so it will not run until you supply your own configuration. See [Setup](#setup).
 
 ## Features
 
@@ -66,6 +66,8 @@ The bot is a single Node process built on `discord.js` v11:
 
 ```
 index.js                     Discord client, event handlers, command router
+config.js                    Loads, merges, and validates config.json
+config.json                  Server IDs, roles, channels, calendar (not committed)
 .env                         Bot token and environment flags (not committed)
 sheets_credentials.json      Google OAuth client (not committed)
 token.json                   Google OAuth token, generated on first run (not committed)
@@ -79,6 +81,7 @@ data/                        Runtime JSON state (not committed)
 
 Major pieces inside `index.js`:
 
+- **Configuration** — `config.js` merges `config.json` over defaults, validates the required values, and fails fast with a list of anything missing.
 - **Poll engine** — `Poll`, `PollOption`, and `PollSetupData` model a guided setup state machine; message handlers advance it, and `node-schedule` closes polls at their expiration.
 - **Google integration** — `setGoogleApiAuth` performs the installed-app OAuth flow and caches a token; `announceNextWeeksEvents` maps calendar entries to embeds.
 - **Lobby lifecycle** — `guildMemberAdd`/`guildMemberRemove` and the midnight job keep `lobby.json` in sync with Discord.
@@ -126,18 +129,29 @@ cp .env.example .env
 | `DEV` | `true` to use a separate development state directory (`<DATA_DIR>/dev`). |
 | `DATA_DIR` | Where runtime JSON state is stored. Defaults to `./data`. |
 
-### 5. Replace the server placeholders
+### 5. Configure the server
 
-This snapshot has the original server's identifiers removed. Search `index.js` for `redacted` and replace each one with your own value:
+```bash
+cp config.example.json config.json
+```
 
-| Placeholder | What it is |
+`config.json` is git-ignored. Kodama refuses to start until the required values are filled in and lists anything that is missing.
+
+| Key | Description |
 | --- | --- |
-| Guild ID | Target server ID. |
-| Role IDs | Member, admin, vetted, and "secret club" roles. |
-| Channel names | `admin-only`, `announcements`, `welcome`, `the-lobby`, and others. |
-| Message IDs | Pinned introduction message and role menus. |
-| Calendar ID / query | Calendar to read and the event title filter. |
-| Spreadsheet ID | Member roster sheet (currently unused; see the roadmap). |
+| `guildId` | ID of the server Kodama runs in. |
+| `ownerId` | Your Discord user ID; enables owner-only commands. |
+| `roles.admin` | Role allowed to run admin commands and receive admin notifications. |
+| `roles.member` | Role assigned to verified members. |
+| `roles.dmsClosed` | Role assigned on admission. |
+| `roles.vetted`, `roles.secretClub`, `roles.secretClubVetted` | Optional roles used by the nightly backfill job. |
+| `roles.admitted` | Roles that count as already admitted for that job. |
+| `channels.*` | Channel names (or IDs). Defaults match the names used by the original server. |
+| `messages.introduction` | ID of the pinned introduction message. |
+| `google.calendarId` | Calendar to read events from. |
+| `google.eventQuery` | Optional title filter for calendar events. |
+| `google.spreadsheetId` | Member roster spreadsheet (reserved; not used yet). |
+| `eventImages.*` | Optional image URLs for each event type. |
 
 ### 6. Run
 
@@ -157,7 +171,6 @@ npm start
 This is a faithful snapshot, not a maintained product. If I picked it up again:
 
 - [ ] Migrate to `discord.js` v14 with intents and slash commands.
-- [ ] Extract configuration (guild, roles, channels, calendar) into a single config module.
 - [ ] Split `index.js` into `commands/`, `events/`, `services/`, and `models/`.
 - [ ] Replace JSON persistence with SQLite and transaction-safe writes.
 - [ ] Add unit tests for the poll state machine and lobby expiry logic.
