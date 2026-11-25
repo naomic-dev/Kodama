@@ -64,10 +64,20 @@ function handleAdminCommand(msg, member) {
 	}
 	else if (member.id == config.ownerId && lowerContent.startsWith('!say')) {
 		const channel = msg.mentions.channels.first(),
-			kodamaMessage = msg.content.substring(msg.content.indexOf(' ', msg.content.indexOf(' ') + 1) + 1).trim(),
+			kodamaMessage = msg.content
+				.replace(/^!say\s+/i, '')
+				.replace(/<#\d+>/, '')
+				.trim(),
 			embed = new RichEmbed()
 				.setColor(0x1abc9c)
 				.setDescription(kodamaMessage);
+
+		if (!channel || !kodamaMessage) {
+			msg.channel.send('Usage: `!say #channel <text>`')
+				.catch(err => log.error('Failed to post !say usage', { memberId: member.id }, err));
+
+			return true;
+		}
 
 		channel.send(embed);
 
@@ -104,7 +114,7 @@ function handleAdminCommand(msg, member) {
 			embed = new RichEmbed()
 				.setColor(0x1abc9c)
 				.setTitle('Hi, I\'m Kodama!')
-				.setDescription('Hello, @everyone! I\'m Kodama.\n\nI\'m a bot Naomi created to help out around the server. I don\'t do a whole lot right now, but Nae\'s adding to me little by little every day!\n\nFind out what I can do with the command \`\`\`kod!help\`\`\`');
+				.setDescription('Hello, @everyone! I\'m Kodama.\n\nI handle onboarding, the lobby, polls, and event announcements around here.\n\nFind out what I can do with the command \`\`\`kod!help\`\`\`');
 
 		channel.fetchMessage(config.messages.introduction)
 			.then(messageToEdit => {

@@ -27,7 +27,7 @@ async function expireLobbyMembers(now = new Date()) {
 	const dmEmbed = new RichEmbed()
 		.setTitle('You\'ve been removed from the server.')
 		.setColor(0x1abc9c)
-		.setDescription('Hi, friend!\n\nYou\'ve been removed our server because you were in the lobby for over a week without introducing yourself.\n\nYou\'re more than welcome to come back any time.');
+		.setDescription('Hi, friend!\n\nYou\'ve been removed from our server because you were in the lobby for over a week without introducing yourself.\n\nYou\'re more than welcome to come back any time.');
 
 	for (const loiterer of state.lobbyList.slice()) {
 		const member = state.guild.members.find(m => m.id == loiterer.id);
@@ -41,7 +41,10 @@ async function expireLobbyMembers(now = new Date()) {
 
 			try {
 				await member.send(dmEmbed);
-				await member.send('invite link');
+
+				if (config.inviteUrl) {
+					await member.send(`You can rejoin with this invite: ${config.inviteUrl}`);
+				}
 			}
 			catch (err) {
 				log.warn('Failed to DM member being kicked', { memberId: member.id }, err);

@@ -4,6 +4,15 @@
   "private": true,
   "description": "Administrative Discord bot for community onboarding, lobby management, polls, and Google Calendar event announcements.",
   "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/naomic-dev/Kodama.git"
+  },
+  "homepage": "https://github.com/naomic-dev/Kodama#readme",
+  "bugs": {
+    "url": "https://github.com/naomic-dev/Kodama/issues"
+  },
+  "author": "Naomi",
   "scripts": {
     "start": "node index.js",
     "test": "node test/poll.test.js && node test/pollSetup.test.js && node test/lobby.test.js"

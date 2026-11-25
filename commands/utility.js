@@ -14,7 +14,37 @@ function handleUtilityCommand(client, msg, command) {
 			embed = new RichEmbed()
 				.setTitle('Kodama Help Menu')
 				.setColor(0x1abc9c)
-				.setDescription(`${msg.member} here is a list of commands you can give me:\n\n__Command Syntax__\`\`\`@Kodama h\nkodama!h\nkod!h\`\`\`\n\nDisplay Help Menu:\`\`\`\nhelp\nh\`\`\`\n\nDisplay Server's avatar:\`\`\`\nserver-avatar\nsa\`\`\`\n\nDisplay a given user's avatar:\`\`\`avatar @user\na @user\`\`\`\n\nStart a poll (admins):\`\`\`\n!poll [#channel]\`\`\``);
+				.setDescription(`${msg.member} here is a list of commands you can give me:
+
+**Command Syntax**
+\`\`\`
+@Kodama <command>
+kodama!<command>
+kod!<command>
+\`\`\`
+
+**Display the help menu**
+\`\`\`
+help
+h
+\`\`\`
+
+**Display the server avatar**
+\`\`\`
+server-avatar
+sa
+\`\`\`
+
+**Display a member's avatar**
+\`\`\`
+avatar @user
+a @user
+\`\`\`
+
+**Start a poll (admins)**
+\`\`\`
+!poll [#channel]
+\`\`\``);
 
 		channel.send(embed)
 			.catch(err => log.error('Failed to post help menu', { channel: 'botSpam' }, err));
@@ -54,7 +84,7 @@ function handleUtilityCommand(client, msg, command) {
 			const embed = new RichEmbed()
 				.setTitle('Command Syntax Error')
 				.setColor(0xe91e63)
-				.setDescription(`${msg.member}\nThe correct syntax for the command is\n\`\`\`kod!icon {user mention}\`\`\``);
+				.setDescription(`${msg.member}\nThe correct syntax for the command is\n\`\`\`kod!avatar {user mention}\`\`\``);
 
 			channel.send(embed)
 				.catch(err => log.error('Failed to post avatar syntax error', { channel: 'botSpam' }, err));

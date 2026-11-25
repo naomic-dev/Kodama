@@ -7,7 +7,7 @@
 ![CI](https://github.com/naomic-dev/Kodama/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-Kodama was the resident admin bot for a community Discord server. It ran 24/7 on a Raspberry Pi in my bedroom while the server was active, handling the server's front door: welcoming new members, verifying them out of a lobby, announcing events from a shared Google Calendar, and running polls for community decisions.
+Kodama was the resident admin bot for a community Discord server. It ran 24/7 on a Raspberry Pi at home while the server was active, handling the server's front door: welcoming new members, verifying them out of a lobby, announcing events from a shared Google Calendar, and running polls for community decisions.
 
 This repository is a **reference snapshot**. Server-specific IDs, channel names, and calendar details live in `config.json`; the values in the repository are placeholders, so it will not run until you supply your own configuration. See [Setup](#setup).
 
@@ -17,7 +17,7 @@ This repository is a **reference snapshot**. Server-specific IDs, channel names,
 
 - DMs every new member a rules summary and a "how to get verified" walkthrough.
 - Posts a welcome message to the introductions channel and a notification to the admin channel.
-- Tracks new members in a 7-day lobby window; a midnight job kicks anyone who has not introduced themselves and DMs them a fresh invite.
+- Tracks new members in a 7-day lobby window; a midnight job kicks anyone who has not introduced themselves and DMs them a short explanation, plus an invite link when `inviteUrl` is configured.
 - Admins verify members with a single reaction on the lobby message (or the `!admit` command), which assigns roles and clears the lobby entry.
 
 ### Polls
@@ -260,6 +260,7 @@ cp config.example.json config.json
 | --- | --- |
 | `guildId` | ID of the server Kodama runs in. |
 | `ownerId` | Your Discord user ID; enables owner-only commands. |
+| `inviteUrl` | Optional invite link sent to members removed by the lobby job. |
 | `roles.admin` | Role allowed to run admin commands and receive admin notifications. |
 | `roles.member` | Role assigned to verified members. |
 | `roles.dmsClosed` | Role assigned on admission. |
@@ -389,7 +390,7 @@ This is a faithful snapshot, not a maintained product. If I picked it up again:
 
 - [ ] Migrate to `discord.js` v14 with intents and slash commands.
 - [ ] Replace JSON persistence with SQLite and transaction-safe writes.
-- [ ] Replace `console.log` with structured logging.
+- [ ] Add ESLint and Prettier to the CI job.
 - [ ] Add screenshots and a short recording to replace the text demo.
 
 ## License

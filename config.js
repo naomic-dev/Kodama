@@ -7,6 +7,7 @@ const CONFIG_PATH = process.env.CONFIG_PATH || path.join(__dirname, 'config.json
 const DEFAULTS = {
 	guildId: '',
 	ownerId: '',
+	inviteUrl: '',
 	roles: {
 		admin: '',
 		member: '',

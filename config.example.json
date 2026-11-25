@@ -1,6 +1,7 @@
 {
   "guildId": "YOUR_GUILD_ID",
   "ownerId": "YOUR_USER_ID",
+  "inviteUrl": "",
   "roles": {
     "admin": "YOUR_ADMIN_ROLE_ID",
     "member": "YOUR_MEMBER_ROLE_ID",
