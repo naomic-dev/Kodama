@@ -16,7 +16,7 @@
   "scripts": {
     "start": "node index.js",
     "test": "node test/poll.test.js && node test/pollSetup.test.js && node test/lobby.test.js",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix"
   },
   "engines": {

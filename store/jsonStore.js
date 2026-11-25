@@ -11,7 +11,7 @@ const FILES = {
 };
 
 const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
-const folderRoot = (process.env.DEV == 'true' ? path.join(dataDir, 'dev') : dataDir);
+const folderRoot = (process.env.DEV === 'true' ? path.join(dataDir, 'dev') : dataDir);
 
 fs.mkdirSync(folderRoot, { recursive: true });
 

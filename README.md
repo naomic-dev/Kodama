@@ -287,14 +287,14 @@ npm test
 
 The suite uses Node's built-in `assert` and runs each file in a separate process, so it adds no dependencies. It covers the poll model, the guided setup state machine, expired-poll closure, and lobby expiry. Tests point `CONFIG_PATH` at a fixture and use a temporary `DATA_DIR`.
 
-The codebase is linted with ESLint, using the style the code is already written in (tabs, single quotes, Stroustrup braces):
+The codebase is linted with ESLint, using the style the code is already written in (tabs, single quotes, Stroustrup braces, strict equality):
 
 ```bash
 npm run lint
 npm run lint:fix
 ```
 
-CI runs `npm run lint` on Node 14 as a separate job, and `npm test` on Node 12 and 14.
+CI runs `npm run lint` on Node 14 as a separate job, failing on any warning or error, and `npm test` on Node 12 and 14.
 
 ## Deployment
 

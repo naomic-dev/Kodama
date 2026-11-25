@@ -8,7 +8,7 @@ function onMessage(client, msg) {
 	const member = msg.member,
 		contentToLowerCase = msg.content.toLowerCase();
 
-	if (msg.channel.type == 'dm' && msg.author.id != client.user.id) {
+	if (msg.channel.type === 'dm' && msg.author.id !== client.user.id) {
 		const channel = getChannel(state.guild, 'adminOnly'),
 			embed = new RichEmbed()
 				.setColor(0x1abc9c)
@@ -16,7 +16,7 @@ function onMessage(client, msg) {
 
 		let embedDescription = `**From:**\n${msg.author}\n\n**Content:**\n${msg.content}`;
 
-		if (msg.attachments.length == 1) {
+		if (msg.attachments.length === 1) {
 			embed.setImage(msg.attachments.first().url);
 		}
 		else if (msg.attachments.length > 1) {
@@ -83,7 +83,7 @@ function onMessage(client, msg) {
 		}
 	}
 
-	if (allowCommands && command != '' && (isMember || isAdmin)) {
+	if (allowCommands && command !== '' && (isMember || isAdmin)) {
 		handleUtilityCommand(client, msg, command);
 	}
 }

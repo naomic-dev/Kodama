@@ -18,10 +18,10 @@
   ],
   "rules": {
     "brace-style": ["error", "stroustrup"],
-    "eqeqeq": ["warn", "smart"],
+    "eqeqeq": ["error", "smart"],
     "indent": ["error", "tab", { "SwitchCase": 1 }],
     "no-var": "error",
-    "prefer-const": "warn",
+    "prefer-const": "error",
     "quotes": ["error", "single", { "avoidEscape": true }],
     "semi": ["error", "always"]
   }

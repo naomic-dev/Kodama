@@ -22,9 +22,9 @@ class Poll {
 	getDescriptionForEmbed(guild, status = 'unfinished') {
 		let returnText = '';
 
-		const member = guild.members.find(m => m.id == this.memberId);
+		const member = guild.members.find(m => m.id === this.memberId);
 
-		if (status == 'finished') {
+		if (status === 'finished') {
 			returnText += `By ${member}\n`;
 			returnText += `Closes on ${formatDateTime(new Date(this.expirationDate))}\n\n`;
 			returnText += `${this.description}\n\n`;
@@ -35,7 +35,7 @@ class Poll {
 				returnText += `${emoji}: \`${option.title}\`\n\n`;
 			});
 		}
-		else if (status == 'unfinished') {
+		else if (status === 'unfinished') {
 			returnText += `By: ${member}\n\n`;
 
 			returnText += `Title: ${(this.title ? this.title : '')}\n`;
@@ -58,7 +58,7 @@ class Poll {
 
 			returnText += '\n';
 		}
-		else if (status == 'closed') {
+		else if (status === 'closed') {
 			returnText += `By ${member}\n`;
 			returnText += `${this.description}\n\n`;
 			returnText += '__**Final Results:**__\n';

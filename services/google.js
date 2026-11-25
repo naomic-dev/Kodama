@@ -99,7 +99,7 @@ function newEventEmbed(event) {
 
 		const date = formatDateTime(event.start.dateTime, event.end.dateTime);
 
-		if (type.toLowerCase() == 'main munch') {
+		if (type.toLowerCase() === 'main munch') {
 			embed.setTitle('The Main Munch')
 				.setDescription('Friends, it\'s time for our largest monthly event, The Main Munch! \n\nDiscover and donate treasures at the Swap-and-Shop table.')
 				.addField('Date', date)
@@ -108,7 +108,7 @@ function newEventEmbed(event) {
 				.addField('Cost', '$2 donation and individual checks (please be sure to support our venue and waitstaff)')
 				.addField('Dress Code', 'Something nice or dress to impress!');
 		}
-		else if (type.toLowerCase() == 'billiards') {
+		else if (type.toLowerCase() === 'billiards') {
 			embed.setTitle('The Hidden Speakeasy Relaxed Meet')
 				.setDescription('We\'re going to be meeting at our local billiard parlor for pool, board games, and drinks!')
 				.addField('Date', date)
@@ -117,7 +117,7 @@ function newEventEmbed(event) {
 				.addField('Cost', '$2 donation, $10 event cost')
 				.addField('Dress Code', 'Nice casual or dress to impress!');
 		}
-		else if (type.toLowerCase() == 'billiards discussion') {
+		else if (type.toLowerCase() === 'billiards discussion') {
 			embed.setTitle('Discussion Group')
 				.setDescription('We\'re going to be meeting at our local billiard parlor for a discussion group!')
 				.addField('Date', date)
@@ -126,7 +126,7 @@ function newEventEmbed(event) {
 				.addField('Cost', '$5 event cost, $2 optional donation')
 				.addField('Dress Code', 'Casual or dress to impress!');
 		}
-		else if (type.toLowerCase() == 'wlgbt brunch') {
+		else if (type.toLowerCase() === 'wlgbt brunch') {
 			embed.setTitle('Women\'s and LGBT+ Sunday Brunch Munch :gay_pride_flag:')
 				.setDescription('Join us for Sunday Brunch, where we celebrate women and the LGBT+ Community, especially those who may not feel as comfortable at our regular events. :pancakes:')
 				.addField('Date', date)
@@ -135,7 +135,7 @@ function newEventEmbed(event) {
 				.addField('Cost', '$2 donation and individual checks (please be sure to support our venue and waitstaff)')
 				.addField('Dress Code', 'Casual or dress to impress!');
 		}
-		else if (type.toLowerCase() == 'wlgbt evening') {
+		else if (type.toLowerCase() === 'wlgbt evening') {
 			embed.setTitle('Women\'s and LGBT+ Evening Munch :gay_pride_flag:')
 				.setDescription('Join us at our Evening Women\'s and LGBT+ Munch, where we celebrate women and the LGBT+ Community, especially those who may not feel as comfortable at our regular events.')
 				.addField('Date', date)
@@ -144,7 +144,7 @@ function newEventEmbed(event) {
 				.addField('Cost', '$2 donation and individual checks (please be sure to support our venue and waitstaff)')
 				.addField('Dress Code', 'Casual or dress to impress!');
 		}
-		else if (type.toLowerCase() == 'crafts') {
+		else if (type.toLowerCase() === 'crafts') {
 			embed.setTitle('Daytime Crafts and Potluck')
 				.setDescription('Join us for a daytime arts and crafts party! :art:\n\nPlease remember to bring a potluck item to share. Extra points for homemade! *Gluten-free makes us happy!* :sparkling_heart:')
 				.addField('Date', date + '\nCome when you can--No strict start time!')
@@ -196,7 +196,7 @@ function announceNextWeeksEvents(guild, auth) {
 			let updateAnnouncedEventsList = false;
 
 			events.forEach((event) => {
-				const announcedEvent = announcedEventList.find(e => e.id == event.id);
+				const announcedEvent = announcedEventList.find(e => e.id === event.id);
 
 				//Send embed and get its id
 

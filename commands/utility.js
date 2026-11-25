@@ -9,7 +9,7 @@ function handleUtilityCommand(client, msg, command) {
 		return false;
 	}
 
-	if (command == 'help' || command == 'h') {
+	if (command === 'help' || command === 'h') {
 		const channel = getChannel(state.guild, 'botSpam'),
 			embed = new RichEmbed()
 				.setTitle('Kodama Help Menu')
@@ -51,7 +51,7 @@ a @user
 
 		return true;
 	}
-	else if (command == 'server-avatar' || command == 'sa') {
+	else if (command === 'server-avatar' || command === 'sa') {
 		const channel = getChannel(state.guild, 'botSpam'),
 			embed = new RichEmbed()
 				.setTitle('Server Avatar')
@@ -64,10 +64,10 @@ a @user
 
 		return true;
 	}
-	else if (command == 'avatar' || command == 'a') {
+	else if (command === 'avatar' || command === 'a') {
 		const channel = getChannel(state.guild, 'botSpam'),
 			mentions = msg.mentions,
-			mentionedUser = mentions.users.filter(u => u.id != client.user.id).first();
+			mentionedUser = mentions.users.filter(u => u.id !== client.user.id).first();
 
 		if (mentionedUser) {
 			const mentionedMember = mentions.members.first(),

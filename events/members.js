@@ -27,7 +27,7 @@ function onGuildMemberAdd(member) {
 
 	expirationDate.setHours(23, 59, 59, 999);
 
-	state.lobbyList = state.lobbyList.filter(loiterer => loiterer.id != member.id);
+	state.lobbyList = state.lobbyList.filter(loiterer => loiterer.id !== member.id);
 
 	dmEmbed.addField('Lobby Removal Date', formatDateForRSVP(expirationDate));
 
@@ -65,11 +65,11 @@ function onGuildMemberRemove(member) {
 		kickedList = store.load('kicked', []);
 	}
 
-	const kickedMemberIndex = kickedList.findIndex(id => id == member.id);
+	const kickedMemberIndex = kickedList.findIndex(id => id === member.id);
 
-	if (kickedMemberIndex != -1) {
+	if (kickedMemberIndex !== -1) {
 		kickedList.splice(kickedMemberIndex, 1);
-		state.lobbyList = state.lobbyList.filter(l => l.id != member.id);
+		state.lobbyList = state.lobbyList.filter(l => l.id !== member.id);
 
 		store.save('kicked', kickedList);
 

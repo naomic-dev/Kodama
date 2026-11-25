@@ -8,7 +8,7 @@ const { Poll } = require('../models/poll');
 function closePoll(poll) {
 	Object.setPrototypeOf(poll, Poll.prototype);
 
-	const channel = state.guild.channels.find(ch => ch.id == poll.channelId),
+	const channel = state.guild.channels.find(ch => ch.id === poll.channelId),
 		embed = new RichEmbed()
 			.setTitle(`Poll '${poll.title}' has closed!`)
 			.setColor(0x1abc9c)
@@ -19,7 +19,7 @@ function closePoll(poll) {
 			.catch(err => log.error('Failed to post poll results', { pollId: poll.id, channelId: poll.channelId }, err));
 	}
 
-	state.openPollList = state.openPollList.filter(p => p.id != poll.id);
+	state.openPollList = state.openPollList.filter(p => p.id !== poll.id);
 
 	store.saveSync('openPolls', state.openPollList);
 }

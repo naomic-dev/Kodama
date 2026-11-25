@@ -30,7 +30,7 @@ async function expireLobbyMembers(now = new Date()) {
 		.setDescription('Hi, friend!\n\nYou\'ve been removed from our server because you were in the lobby for over a week without introducing yourself.\n\nYou\'re more than welcome to come back any time.');
 
 	for (const loiterer of state.lobbyList.slice()) {
-		const member = state.guild.members.find(m => m.id == loiterer.id);
+		const member = state.guild.members.find(m => m.id === loiterer.id);
 
 		if (member && member.roles.get(config.roles.admin) == null && new Date(loiterer.expirationDate) <= now) {
 			if (!kickedList.includes(member.id)) {
@@ -59,11 +59,11 @@ async function expireLobbyMembers(now = new Date()) {
 
 			kickedMembers += member + '\n';
 
-			state.lobbyList = state.lobbyList.filter(l => l.id != loiterer.id);
+			state.lobbyList = state.lobbyList.filter(l => l.id !== loiterer.id);
 			updateLobbyListFile = true;
 		}
 		else if (!member) {
-			state.lobbyList = state.lobbyList.filter(l => l.id != loiterer.id);
+			state.lobbyList = state.lobbyList.filter(l => l.id !== loiterer.id);
 			updateLobbyListFile = true;
 		}
 	}
@@ -76,7 +76,7 @@ async function expireLobbyMembers(now = new Date()) {
 		store.saveSync('kicked', kickedList);
 	}
 
-	if (kickedMembers != '') {
+	if (kickedMembers !== '') {
 		const adminOnlyChannel = getChannel(state.guild, 'adminOnly'),
 			embed = new RichEmbed()
 				.setTitle('The following members were kicked from the lobby!')

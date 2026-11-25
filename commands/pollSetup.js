@@ -11,7 +11,7 @@ function handlePollSetup(msg, member, contentToLowerCase) {
 		return false;
 	}
 
-	const poll = (state.unfinishedPollList.length > 0 ? state.unfinishedPollList.find(p => p.memberId == member.id) : null);
+	const poll = (state.unfinishedPollList.length > 0 ? state.unfinishedPollList.find(p => p.memberId === member.id) : null);
 
 	if (!poll) {
 		return false;
@@ -19,20 +19,20 @@ function handlePollSetup(msg, member, contentToLowerCase) {
 
 	Object.setPrototypeOf(poll, Poll.prototype);
 
-	const pollListIndex = state.unfinishedPollList.findIndex(p => p.memberId == member.id),
+	const pollListIndex = state.unfinishedPollList.findIndex(p => p.memberId === member.id),
 		embed = new RichEmbed()
 			.setColor(0x1abc9c);
 
 	let updateUnfinishedList = true;
 
 	if (poll.title == null) {
-		poll.title = (msg.content == 'none' ? '' : msg.content);
+		poll.title = (msg.content === 'none' ? '' : msg.content);
 
 		embed.setDescription(poll.getDescriptionForEmbed(state.guild) + '**Next: Type out a description for your poll.**');
 
 	}
 	else if (poll.description == null) {
-		poll.description = (msg.content == 'none' ? '' : msg.content);
+		poll.description = (msg.content === 'none' ? '' : msg.content);
 
 		embed.setDescription(poll.getDescriptionForEmbed(state.guild) + '**Next: Type out a poll duration.**\n\n*Ex: 1 hour\nEx: 4 days*');
 	}
@@ -70,10 +70,10 @@ function handlePollSetup(msg, member, contentToLowerCase) {
 		}
 	}
 	else if (poll.optionsAreMutuallyExclusive == null) {
-		if (contentToLowerCase == 'yes' || contentToLowerCase == 'y' || contentToLowerCase == 'true' || contentToLowerCase == 't') {
+		if (contentToLowerCase === 'yes' || contentToLowerCase === 'y' || contentToLowerCase === 'true' || contentToLowerCase === 't') {
 			poll.optionsAreMutuallyExclusive = true;
 		}
-		else if (contentToLowerCase == 'no' || contentToLowerCase == 'n' || contentToLowerCase == 'false' || contentToLowerCase == 'f') {
+		else if (contentToLowerCase === 'no' || contentToLowerCase === 'n' || contentToLowerCase === 'false' || contentToLowerCase === 'f') {
 			poll.optionsAreMutuallyExclusive = false;
 		}
 		else {
@@ -86,13 +86,13 @@ function handlePollSetup(msg, member, contentToLowerCase) {
 			embed.setDescription(poll.getDescriptionForEmbed(state.guild) + '**Next: Type out a voting option for your poll.**');
 		}
 	}
-	else if ((poll.options.length == 0 || poll.options[poll.options.length - 1].emoji != null) && contentToLowerCase != '[done]') {
+	else if ((poll.options.length === 0 || poll.options[poll.options.length - 1].emoji != null) && contentToLowerCase !== '[done]') {
 		poll.addOption(msg.content);
 
 		embed.setDescription(poll.getDescriptionForEmbed(state.guild) + '**Next: React with an emoji for this option.**\n\nNote: The emoji must be a default emoji or a custom emoji from this server.');
 	}
 
-	if (poll.options.length > 1 && poll.options[poll.options.length - 1].emoji != null && contentToLowerCase == '[done]') {
+	if (poll.options.length > 1 && poll.options[poll.options.length - 1].emoji != null && contentToLowerCase === '[done]') {
 		const newPollEmbed = new RichEmbed()
 			.setColor(0x1abc9c)
 			.setTitle('Poll: ' + poll.title)
@@ -100,13 +100,13 @@ function handlePollSetup(msg, member, contentToLowerCase) {
 
 		embed.setTitle('Poll Set Up Complete!');
 
-		state.unfinishedPollList = state.unfinishedPollList.filter(p => p.memberId != member.id);
+		state.unfinishedPollList = state.unfinishedPollList.filter(p => p.memberId !== member.id);
 
 		if (store.exists('openPolls')) {
 			state.openPollList = store.load('openPolls', []);
 		}
 
-		const channel = state.guild.channels.find(ch => ch.id == poll.channelId);
+		const channel = state.guild.channels.find(ch => ch.id === poll.channelId);
 
 		if (!channel) {
 			log.error('Poll channel not found', { pollId: poll.id, channelId: poll.channelId });
@@ -141,13 +141,13 @@ function handlePollSetup(msg, member, contentToLowerCase) {
 	else {
 		embed.setTitle('New Poll Set Up');
 
-		const pollSetupChannel = state.guild.channels.find(ch => ch.id == poll.setupData.channelId),
-			pollMessage = (pollSetupChannel ? pollSetupChannel.messages.find(m => m.id == poll.setupData.messageId) : null);
+		const pollSetupChannel = state.guild.channels.find(ch => ch.id === poll.setupData.channelId),
+			pollMessage = (pollSetupChannel ? pollSetupChannel.messages.find(m => m.id === poll.setupData.messageId) : null);
 
-		if ((poll.options.length <= 1 || poll.options[poll.options.length - 1].emoji == null) && contentToLowerCase == '[done]') {
+		if ((poll.options.length <= 1 || poll.options[poll.options.length - 1].emoji == null) && contentToLowerCase === '[done]') {
 			let errorMessage = '';
 
-			if (poll.options.length == 0 || (poll.options.length == 1 && (poll.options[0].emoji != null))) {
+			if (poll.options.length === 0 || (poll.options.length === 1 && (poll.options[0].emoji != null))) {
 				errorMessage = '**ERROR: You must have a total of two or more voting options!\n\nNext: Type out a voting option for your poll.**';
 			}
 			else {

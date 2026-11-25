@@ -16,16 +16,16 @@ async function onMessageReactionAdd(client, reaction, reactionUser) {
 		return;
 	}
 
-	const unfinishedPollIndex = state.unfinishedPollList.findIndex(p => p.memberId == reactionMember.id && p.setupData && p.setupData.messageId == reaction.message.id),
-		openPollIndex = (unfinishedPollIndex != -1 ? -1 : state.openPollList.findIndex(p => p.messageId == reaction.message.id)),
-		lobbyListIndex = (unfinishedPollIndex != -1 || openPollIndex != -1 ? -1 : state.lobbyList.findIndex(l => l.message_id == reaction.message.id));
+	const unfinishedPollIndex = state.unfinishedPollList.findIndex(p => p.memberId === reactionMember.id && p.setupData && p.setupData.messageId === reaction.message.id),
+		openPollIndex = (unfinishedPollIndex !== -1 ? -1 : state.openPollList.findIndex(p => p.messageId === reaction.message.id)),
+		lobbyListIndex = (unfinishedPollIndex !== -1 || openPollIndex !== -1 ? -1 : state.lobbyList.findIndex(l => l.message_id === reaction.message.id));
 
-	if (unfinishedPollIndex != -1 && state.unfinishedPollList[unfinishedPollIndex]) {
+	if (unfinishedPollIndex !== -1 && state.unfinishedPollList[unfinishedPollIndex]) {
 		const unfinishedPoll = state.unfinishedPollList[unfinishedPollIndex];
 
 		Object.setPrototypeOf(unfinishedPoll, Poll.prototype);
 
-		const option = (unfinishedPoll.setupData && unfinishedPoll.setupData.messageId == reaction.message.id && unfinishedPoll.options.length > 0 ? unfinishedPoll.options[unfinishedPoll.options.length - 1] : null),
+		const option = (unfinishedPoll.setupData && unfinishedPoll.setupData.messageId === reaction.message.id && unfinishedPoll.options.length > 0 ? unfinishedPoll.options[unfinishedPoll.options.length - 1] : null),
 			embed = new RichEmbed()
 				.setColor(0x1abc9c)
 				.setTitle('New Poll Set Up');
@@ -54,12 +54,12 @@ async function onMessageReactionAdd(client, reaction, reactionUser) {
 			}
 		}
 	}
-	else if (openPollIndex != -1 && state.openPollList[openPollIndex]) {
+	else if (openPollIndex !== -1 && state.openPollList[openPollIndex]) {
 		if (state.openPollList[openPollIndex].optionsAreMutuallyExclusive) {
-			state.openPollList[openPollIndex].options.filter(o => o.emoji.name != reaction.emoji.name && o.emoji.id != reaction.emoji.id).forEach((option) => {
-				option.memberIds = option.memberIds.filter(i => i != reactionMember.id);
+			state.openPollList[openPollIndex].options.filter(o => o.emoji.name !== reaction.emoji.name && o.emoji.id !== reaction.emoji.id).forEach((option) => {
+				option.memberIds = option.memberIds.filter(i => i !== reactionMember.id);
 
-				const otherReaction = reaction.message.reactions.find(r => r.emoji.name == option.emoji.name && r.emoji.id == option.emoji.id);
+				const otherReaction = reaction.message.reactions.find(r => r.emoji.name === option.emoji.name && r.emoji.id === option.emoji.id);
 
 				if (otherReaction) {
 					otherReaction.remove(reactionUser);
@@ -67,9 +67,9 @@ async function onMessageReactionAdd(client, reaction, reactionUser) {
 			});
 		}
 
-		const optionListIndex = state.openPollList[openPollIndex].options.findIndex(o => o.emoji.name == reaction.emoji.name && o.emoji.id == reaction.emoji.id);
+		const optionListIndex = state.openPollList[openPollIndex].options.findIndex(o => o.emoji.name === reaction.emoji.name && o.emoji.id === reaction.emoji.id);
 
-		if (optionListIndex != -1) {
+		if (optionListIndex !== -1) {
 			const option = state.openPollList[openPollIndex].options[optionListIndex];
 
 			if (!option.memberIds.includes(reactionMember.id)) {
@@ -79,15 +79,15 @@ async function onMessageReactionAdd(client, reaction, reactionUser) {
 			}
 		}
 	}
-	else if (lobbyListIndex != -1 && state.lobbyList[lobbyListIndex]) {
+	else if (lobbyListIndex !== -1 && state.lobbyList[lobbyListIndex]) {
 		const loiterer = state.lobbyList[lobbyListIndex],
-			loitererMember = state.guild.members.find(m => m.id == loiterer.id);
+			loitererMember = state.guild.members.find(m => m.id === loiterer.id);
 
 		if (!loitererMember) {
 			return;
 		}
 
-		if (reaction.emoji.name == '👎') {
+		if (reaction.emoji.name === '👎') {
 			log.info('Lobby rejection logged', { memberId: loiterer.id, displayName: loitererMember.displayName });
 		}
 		else {
@@ -108,15 +108,15 @@ async function onMessageReactionRemove(reaction, reactionUser) {
 		return;
 	}
 
-	const openPollIndex = state.openPollList.findIndex(p => p.messageId == reaction.message.id);
+	const openPollIndex = state.openPollList.findIndex(p => p.messageId === reaction.message.id);
 
-	if (openPollIndex != -1 && state.openPollList[openPollIndex]) {
-		const optionListIndex = state.openPollList[openPollIndex].options.findIndex(o => o.emoji.name == reaction.emoji.name && o.emoji.id == reaction.emoji.id);
+	if (openPollIndex !== -1 && state.openPollList[openPollIndex]) {
+		const optionListIndex = state.openPollList[openPollIndex].options.findIndex(o => o.emoji.name === reaction.emoji.name && o.emoji.id === reaction.emoji.id);
 
-		if (optionListIndex != -1) {
+		if (optionListIndex !== -1) {
 			const option = state.openPollList[openPollIndex].options[optionListIndex];
 
-			option.memberIds = option.memberIds.filter(i => i != reactionMember.id);
+			option.memberIds = option.memberIds.filter(i => i !== reactionMember.id);
 
 			store.save('openPolls', state.openPollList);
 		}

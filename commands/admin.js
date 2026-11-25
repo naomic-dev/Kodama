@@ -32,7 +32,7 @@ function handleAdminCommand(msg, member) {
 		else {
 			const username = msg.content.substr(msg.content.indexOf(' ') + 1);
 
-			targetMember = state.guild.members.find(m => m.displayName.toLowerCase() == username.toLowerCase());
+			targetMember = state.guild.members.find(m => m.displayName.toLowerCase() === username.toLowerCase());
 		}
 
 		admitMember(targetMember);
@@ -62,7 +62,7 @@ function handleAdminCommand(msg, member) {
 
 		return true;
 	}
-	else if (member.id == config.ownerId && lowerContent.startsWith('!say')) {
+	else if (member.id === config.ownerId && lowerContent.startsWith('!say')) {
 		const channel = msg.mentions.channels.first(),
 			kodamaMessage = msg.content
 				.replace(/^!say\s+/i, '')
@@ -83,7 +83,7 @@ function handleAdminCommand(msg, member) {
 
 		return true;
 	}
-	else if (member.id == config.ownerId && lowerContent == '!ping') {
+	else if (member.id === config.ownerId && lowerContent === '!ping') {
 		const channel = getChannel(state.guild, 'kodamaTest'),
 			embed = new RichEmbed()
 				.setColor(0x1abc9c)
@@ -93,12 +93,12 @@ function handleAdminCommand(msg, member) {
 
 		return true;
 	}
-	else if (member.id == config.ownerId && lowerContent.startsWith('!announce-events')) {
+	else if (member.id === config.ownerId && lowerContent.startsWith('!announce-events')) {
 		googleService.announceNextWeeksEvents(state.guild, googleService.getAuth());
 
 		return true;
 	}
-	else if (member.id == config.ownerId && lowerContent == '!event-tag-format') {
+	else if (member.id === config.ownerId && lowerContent === '!event-tag-format') {
 		const channel = getChannel(state.guild, 'kodamaTest'),
 			embed = new RichEmbed()
 				.setColor(0x1abc9c)
@@ -109,7 +109,7 @@ function handleAdminCommand(msg, member) {
 
 		return true;
 	}
-	else if (member.id == config.ownerId && lowerContent == '!update-introduction') {
+	else if (member.id === config.ownerId && lowerContent === '!update-introduction') {
 		const channel = getChannel(state.guild, 'announcements'),
 			embed = new RichEmbed()
 				.setColor(0x1abc9c)
@@ -125,10 +125,10 @@ function handleAdminCommand(msg, member) {
 
 		return true;
 	}
-	else if (member.id == config.ownerId && lowerContent.startsWith('!add-to-lobby-list') && msg.content.includes(' ')) {
+	else if (member.id === config.ownerId && lowerContent.startsWith('!add-to-lobby-list') && msg.content.includes(' ')) {
 		const channel = getChannel(state.guild, 'kodamaTest'),
 			username = msg.content.substr(msg.content.indexOf(' ') + 1).trim(),
-			targetMember = state.guild.members.find(m => m.displayName == username),
+			targetMember = state.guild.members.find(m => m.displayName === username),
 			embed = new RichEmbed()
 				.setColor(0x1abc9c)
 				.setTitle('Member Added to Lobby List!');
@@ -142,7 +142,7 @@ function handleAdminCommand(msg, member) {
 
 			expirationDate.setHours(23, 59, 59, 999);
 
-			state.lobbyList = state.lobbyList.filter(loiterer => loiterer.id != targetMember.id);
+			state.lobbyList = state.lobbyList.filter(loiterer => loiterer.id !== targetMember.id);
 
 			embed.setDescription(`Added ${targetMember.displayName} to "lobby.json"\n`);
 			channel.send(embed)
@@ -167,25 +167,25 @@ function handleAdminCommand(msg, member) {
 
 		return true;
 	}
-	else if (member.id == config.ownerId && lowerContent == '!check-lobby-list') {
+	else if (member.id === config.ownerId && lowerContent === '!check-lobby-list') {
 		(async function () {
 			let updateLobbyListFile = false,
 				kickedMembers = '';
 
 			state.lobbyList.forEach(function (loiterer) {
-				const member = state.guild.members.find(m => m.id == loiterer.id);
+				const member = state.guild.members.find(m => m.id === loiterer.id);
 
 				log.debug('Checking lobby entry', { memberId: loiterer.id, expiresAt: loiterer.expirationDate });
 
 				if (member && new Date(loiterer.expirationDate) <= new Date()) {
 					kickedMembers += member + '\n';
 
-					state.lobbyList = state.lobbyList.filter(l => l.id != loiterer.id);
+					state.lobbyList = state.lobbyList.filter(l => l.id !== loiterer.id);
 
 					updateLobbyListFile = true;
 				}
 				else if (!member) {
-					state.lobbyList = state.lobbyList.filter(l => l.id != loiterer.id);
+					state.lobbyList = state.lobbyList.filter(l => l.id !== loiterer.id);
 
 					updateLobbyListFile = true;
 				}
@@ -195,7 +195,7 @@ function handleAdminCommand(msg, member) {
 				store.save('lobby', state.lobbyList);
 			}
 
-			if (kickedMembers != '') {
+			if (kickedMembers !== '') {
 				const channel = getChannel(state.guild, 'kodamaTest'),
 					embed = new RichEmbed()
 						.setTitle('The following members should be kicked from the lobby!')

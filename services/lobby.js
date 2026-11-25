@@ -24,7 +24,7 @@ function admitMember(targetMember) {
 
 		let adminOnlyEmbedDescription = `${targetMember.displayName} has been assigned the Member and DMs Closed roles.`;
 
-		state.lobbyList = state.lobbyList.filter(loiterer => loiterer.id != targetMember.id);
+		state.lobbyList = state.lobbyList.filter(loiterer => loiterer.id !== targetMember.id);
 
 		store.saveSync('lobby', state.lobbyList);
 
@@ -73,10 +73,10 @@ function addMissingSecretClubRoles() {
 		secretClubVettedRoleId = config.roles.secretClubVetted,
 		admittedRoles = config.roles.admitted;
 
-	state.guild.members.filter(m => m.roles.find(r => r.id == memberRoleId)).forEach((member) => {
+	state.guild.members.filter(m => m.roles.find(r => r.id === memberRoleId)).forEach((member) => {
 		if (member.roles.some(r => admittedRoles.includes(r.id))) {
-			if (!member.roles.find(r => r.id == secretClubRoleId)) {
-				if (member.roles.find(r => r.id == vettedRoleId)) {
+			if (!member.roles.find(r => r.id === secretClubRoleId)) {
+				if (member.roles.find(r => r.id === vettedRoleId)) {
 					member.addRoles([secretClubRoleId, secretClubVettedRoleId]);
 				}
 				else {
