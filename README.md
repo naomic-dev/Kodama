@@ -63,6 +63,83 @@ Reacting to a lobby entry with any emoji verifies that member; 👎 is logged as
 
 Utility commands are available to verified members and admins; the remaining commands require the admin role (and the owner-only commands additionally require `ownerId`).
 
+## Demo
+
+Illustrative transcript; names, IDs, dates, and vote counts are placeholders.
+
+```text
+<Admin> !poll #announcements
+<Kodama> New Poll Set Up
+         Creator: Admin
+         Title:
+         Description:
+         Expiration Date:
+         Options:
+
+         Select a title for your poll
+
+<Admin> Lunch?
+<Kodama> By: Admin
+
+         Title: Lunch?
+         Description:
+         Closes on:
+         Options mutually exclusive:
+         Options:
+
+         Next: Type out a description for your poll.
+
+<Admin> Pick a place
+<Kodama> ... Next: Type out a poll duration.
+
+<Admin> 1 hour
+<Kodama> ... Next: Should options on this poll be mutually exclusive?
+
+<Admin> no
+<Kodama> ... Next: Type out a voting option for your poll.
+
+<Admin> Pizza
+<Kodama> ... Next: React with an emoji for this option.
+
+<Admin> [reacts 🍕]
+<Kodama> ... Next: Type out another voting option. Type [done] when finished.
+
+<Admin> Sushi
+<Kodama> ... Next: React with an emoji for this option.
+
+<Admin> [reacts 🍣]
+<Admin> [done]
+<Kodama> Poll Set Up Complete!
+<Kodama> Poll: Lunch?
+         By Admin
+         Closes on November 24, 2026 (02:00 PM)
+         Pick a place
+
+         🍕: `Pizza`
+
+         🍣: `Sushi`
+```
+
+```text
+<Kodama> Poll 'Lunch?' has closed!
+         By Admin
+         Pick a place
+
+         __Final Results:__
+         `Pizza`: **5**
+
+         `Sushi`: **2**
+```
+
+```text
+<Kodama> The Main Munch
+         Friends, it's time for our largest monthly event...
+         Date: December 6, 2026 (02:00 PM)
+         Location: Visit our event page to get the address!
+         Eligible Members: Everyone!
+         Don't forget to RSVP! https://...
+```
+
 ## Architecture
 
 The bot is a single Node process built on `discord.js` v11:
@@ -313,7 +390,7 @@ This is a faithful snapshot, not a maintained product. If I picked it up again:
 - [ ] Migrate to `discord.js` v14 with intents and slash commands.
 - [ ] Replace JSON persistence with SQLite and transaction-safe writes.
 - [ ] Replace `console.log` with structured logging.
-- [ ] Add screenshots and a short demo recording.
+- [ ] Add screenshots and a short recording to replace the text demo.
 
 ## License
 
