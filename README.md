@@ -148,6 +148,7 @@ The bot is a single Node process built on `discord.js` v11:
 index.js                     Bootstrap: client, event registration, login
 config.js                    Loads, merges, and validates config.json
 logger.js                    Dependency-free structured logger
+.eslintrc.json               ESLint configuration
 commands/
   admin.js                   Owner and admin commands
   pollSetup.js               Guided poll setup state machine
@@ -180,7 +181,7 @@ test/
 Dockerfile                   Container image
 .dockerignore                Build context exclusions
 deploy/kodama.service        Raspberry Pi systemd unit
-.github/workflows/ci.yml     Test matrix (Node 12 and 14)
+.github/workflows/ci.yml     Tests (Node 12/14) and lint (Node 14)
 config.json                  Server IDs, roles, channels, calendar (not committed)
 .env                         Bot token and environment flags (not committed)
 google_credentials.json      Google OAuth client (not committed)
@@ -286,6 +287,15 @@ npm test
 
 The suite uses Node's built-in `assert` and runs each file in a separate process, so it adds no dependencies. It covers the poll model, the guided setup state machine, expired-poll closure, and lobby expiry. Tests point `CONFIG_PATH` at a fixture and use a temporary `DATA_DIR`.
 
+The codebase is linted with ESLint, using the style the code is already written in (tabs, single quotes, Stroustrup braces):
+
+```bash
+npm run lint
+npm run lint:fix
+```
+
+CI runs `npm run lint` on Node 14 as a separate job, and `npm test` on Node 12 and 14.
+
 ## Deployment
 
 ### Docker
@@ -390,7 +400,8 @@ This is a faithful snapshot, not a maintained product. If I picked it up again:
 
 - [ ] Migrate to `discord.js` v14 with intents and slash commands.
 - [ ] Replace JSON persistence with SQLite and transaction-safe writes.
-- [ ] Add ESLint and Prettier to the CI job.
+- [ ] Add Prettier once the code moves to `discord.js` v14.
+- [ ] Add screenshots and a short recording to replace the text demo.
 - [ ] Add screenshots and a short recording to replace the text demo.
 
 ## License

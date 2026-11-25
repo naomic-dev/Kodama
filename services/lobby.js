@@ -16,7 +16,7 @@ function admitMember(targetMember) {
 			selfAssignRolesChannel = getChannel(state.guild, 'selfAssignRoles'),
 			infoAndFaqChannel = getChannel(state.guild, 'infoAndFaq');
 
-		targetMember.addRoles([config.roles.member, config.roles.dmsClosed])
+		targetMember.addRoles([config.roles.member, config.roles.dmsClosed]);
 
 		log.info('Member admitted', { memberId: targetMember.id, displayName: targetMember.displayName });
 
@@ -28,7 +28,7 @@ function admitMember(targetMember) {
 
 		store.saveSync('lobby', state.lobbyList);
 
-		adminOnlyEmbedDescription += `\n\nRemoved ${targetMember.displayName} from \"lobby.json\"`;
+		adminOnlyEmbedDescription += `\n\nRemoved ${targetMember.displayName} from "lobby.json"`;
 
 		adminOnlyEmbed.setDescription(adminOnlyEmbedDescription);
 
@@ -59,7 +59,7 @@ function admitMember(targetMember) {
 		}).catch(err => log.error('Failed to DM admitted member', { memberId: targetMember.id }, err));
 	}
 	else {
-		adminOnlyEmbed.setDescription(`User not found!`);
+		adminOnlyEmbed.setDescription('User not found!');
 
 		adminOnlyChannel.send(adminOnlyEmbed)
 			.catch(err => log.error('Failed to post not-found notice', { channel: 'adminOnly' }, err));

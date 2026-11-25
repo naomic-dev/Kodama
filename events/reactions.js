@@ -57,14 +57,14 @@ async function onMessageReactionAdd(client, reaction, reactionUser) {
 	else if (openPollIndex != -1 && state.openPollList[openPollIndex]) {
 		if (state.openPollList[openPollIndex].optionsAreMutuallyExclusive) {
 			state.openPollList[openPollIndex].options.filter(o => o.emoji.name != reaction.emoji.name && o.emoji.id != reaction.emoji.id).forEach((option) => {
-				option.memberIds = option.memberIds.filter(i => i != reactionMember.id)
+				option.memberIds = option.memberIds.filter(i => i != reactionMember.id);
 
 				const otherReaction = reaction.message.reactions.find(r => r.emoji.name == option.emoji.name && r.emoji.id == option.emoji.id);
 
 				if (otherReaction) {
 					otherReaction.remove(reactionUser);
 				}
-			})
+			});
 		}
 
 		const optionListIndex = state.openPollList[openPollIndex].options.findIndex(o => o.emoji.name == reaction.emoji.name && o.emoji.id == reaction.emoji.id);
@@ -87,7 +87,7 @@ async function onMessageReactionAdd(client, reaction, reactionUser) {
 			return;
 		}
 
-		if (reaction.emoji.name == "👎") {
+		if (reaction.emoji.name == '👎') {
 			log.info('Lobby rejection logged', { memberId: loiterer.id, displayName: loitererMember.displayName });
 		}
 		else {

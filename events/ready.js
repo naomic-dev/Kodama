@@ -7,7 +7,7 @@ const { scheduleMidnightJobs } = require('../services/scheduler');
 const { schedulePollClosures } = require('../services/polls');
 
 async function onReady(client) {
-	state.guild = client.guilds.find(g => g.id === config.guildId)
+	state.guild = client.guilds.find(g => g.id === config.guildId);
 
 	if (!state.guild) {
 		log.error('Configured guild not found', { guildId: config.guildId });

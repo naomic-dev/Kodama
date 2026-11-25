@@ -114,7 +114,7 @@ function handleAdminCommand(msg, member) {
 			embed = new RichEmbed()
 				.setColor(0x1abc9c)
 				.setTitle('Hi, I\'m Kodama!')
-				.setDescription('Hello, @everyone! I\'m Kodama.\n\nI handle onboarding, the lobby, polls, and event announcements around here.\n\nFind out what I can do with the command \`\`\`kod!help\`\`\`');
+				.setDescription('Hello, @everyone! I\'m Kodama.\n\nI handle onboarding, the lobby, polls, and event announcements around here.\n\nFind out what I can do with the command ```kod!help```');
 
 		channel.fetchMessage(config.messages.introduction)
 			.then(messageToEdit => {
@@ -144,7 +144,7 @@ function handleAdminCommand(msg, member) {
 
 			state.lobbyList = state.lobbyList.filter(loiterer => loiterer.id != targetMember.id);
 
-			embed.setDescription(`Added ${targetMember.displayName} to \"lobby.json\"\n`);
+			embed.setDescription(`Added ${targetMember.displayName} to "lobby.json"\n`);
 			channel.send(embed)
 				.then((msg) => {
 					state.lobbyList.push({ id: targetMember.id, expirationDate: expirationDate, message_id: msg.id });

@@ -183,41 +183,42 @@ function announceNextWeeksEvents(guild, auth) {
 		orderBy: 'startTime',
 		q: config.google.eventQuery
 	},
-		(err, res) => {
-			if (err) return log.error('Google Calendar API request failed', { calendarId: config.google.calendarId }, err);
+	(err, res) => {
+		if (err) return log.error('Google Calendar API request failed', { calendarId: config.google.calendarId }, err);
 
-			const events = res.data.items;
+		const events = res.data.items;
 
-			if (events.length) {
-				const channel = getChannel(guild, 'announcements');
+		if (events.length) {
+			const channel = getChannel(guild, 'announcements');
 
-				let announcedEventList = store.load('announcedEvents', []),
-					updateAnnouncedEventsList = false;
+			const announcedEventList = store.load('announcedEvents', []);
 
-				events.forEach((event) => {
-					const announcedEvent = announcedEventList.find(e => e.id == event.id);
+			let updateAnnouncedEventsList = false;
 
-					//Send embed and get its id
+			events.forEach((event) => {
+				const announcedEvent = announcedEventList.find(e => e.id == event.id);
 
-					if (!announcedEvent) {
-						const embed = newEventEmbed(event);
+				//Send embed and get its id
 
-						if (embed) {
-							channel.send(embed)
-								.catch(err => log.error('Failed to announce event', { eventId: event.id }, err));
+				if (!announcedEvent) {
+					const embed = newEventEmbed(event);
 
-							announcedEventList.push({ id: event.id });
+					if (embed) {
+						channel.send(embed)
+							.catch(err => log.error('Failed to announce event', { eventId: event.id }, err));
 
-							updateAnnouncedEventsList = true;
-						}
+						announcedEventList.push({ id: event.id });
+
+						updateAnnouncedEventsList = true;
 					}
-				});
-
-				if (updateAnnouncedEventsList) {
-					store.save('announcedEvents', announcedEventList);
 				}
+			});
+
+			if (updateAnnouncedEventsList) {
+				store.save('announcedEvents', announcedEventList);
 			}
-		});
+		}
+	});
 }
 
 module.exports = {

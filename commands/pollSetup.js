@@ -79,7 +79,7 @@ function handlePollSetup(msg, member, contentToLowerCase) {
 		else {
 			updateUnfinishedList = false;
 			embed.setDescription(poll.getDescriptionForEmbed(state.guild) + '**ERROR: response must be one of the following:**\nyes, y, true, t\nno, n, false, f\n\n**Next: Should options on this poll be mutually exclusive?**\nIf "yes", users will only be able to pick one option at a time.**')
-				.setColor(0xe91e63);;
+				.setColor(0xe91e63);
 		}
 
 		if (poll.optionsAreMutuallyExclusive != null) {
@@ -106,7 +106,7 @@ function handlePollSetup(msg, member, contentToLowerCase) {
 			state.openPollList = store.load('openPolls', []);
 		}
 
-		const channel = state.guild.channels.find(ch => ch.id == poll.channelId)
+		const channel = state.guild.channels.find(ch => ch.id == poll.channelId);
 
 		if (!channel) {
 			log.error('Poll channel not found', { pollId: poll.id, channelId: poll.channelId });
@@ -148,10 +148,10 @@ function handlePollSetup(msg, member, contentToLowerCase) {
 			let errorMessage = '';
 
 			if (poll.options.length == 0 || (poll.options.length == 1 && (poll.options[0].emoji != null))) {
-				errorMessage = '**ERROR: You must have a total of two or more voting options!\n\nNext: Type out a voting option for your poll.**'
+				errorMessage = '**ERROR: You must have a total of two or more voting options!\n\nNext: Type out a voting option for your poll.**';
 			}
 			else {
-				errorMessage = '**ERROR: You must react to this message with an emoji before you can finish this poll!\n\nNext: React with an emoji for this option.**\n\nNote: The emoji must be a default emoji or a custom emoji from this server.'
+				errorMessage = '**ERROR: You must react to this message with an emoji before you can finish this poll!\n\nNext: React with an emoji for this option.**\n\nNote: The emoji must be a default emoji or a custom emoji from this server.';
 			}
 
 			embed.setColor(0xe91e63)

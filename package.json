@@ -15,7 +15,9 @@
   "author": "Naomi",
   "scripts": {
     "start": "node index.js",
-    "test": "node test/poll.test.js && node test/pollSetup.test.js && node test/lobby.test.js"
+    "test": "node test/poll.test.js && node test/pollSetup.test.js && node test/lobby.test.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "engines": {
     "node": ">=12 <15"
@@ -26,6 +28,9 @@
     "googleapis": "49.0.0",
     "node-schedule": "1.3.3",
     "uuid": "3.4.0"
+  },
+  "devDependencies": {
+    "eslint": "8.57.1"
   },
   "license": "MIT"
 }

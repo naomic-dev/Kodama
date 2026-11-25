@@ -11,8 +11,8 @@ function onMessage(client, msg) {
 	if (msg.channel.type == 'dm' && msg.author.id != client.user.id) {
 		const channel = getChannel(state.guild, 'adminOnly'),
 			embed = new RichEmbed()
-			.setColor(0x1abc9c)
-			.setTitle(`${msg.author.username} sent Kodama a DM`);
+				.setColor(0x1abc9c)
+				.setTitle(`${msg.author.username} sent Kodama a DM`);
 
 		let embedDescription = `**From:**\n${msg.author}\n\n**Content:**\n${msg.content}`;
 
@@ -26,7 +26,7 @@ function onMessage(client, msg) {
 				embedDescription += attachment.url + '\n';
 			});
 
-			embed.setImage(msg.attachments.first().url)
+			embed.setImage(msg.attachments.first().url);
 		}
 
 		embed.setDescription(embedDescription);

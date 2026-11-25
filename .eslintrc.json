@@ -1,0 +1,28 @@
+{
+  "root": true,
+  "env": {
+    "node": true,
+    "es2019": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2019,
+    "sourceType": "script"
+  },
+  "extends": [
+    "eslint:recommended"
+  ],
+  "ignorePatterns": [
+    "node_modules/",
+    "data/",
+    "runtime/"
+  ],
+  "rules": {
+    "brace-style": ["error", "stroustrup"],
+    "eqeqeq": ["warn", "smart"],
+    "indent": ["error", "tab", { "SwitchCase": 1 }],
+    "no-var": "error",
+    "prefer-const": "warn",
+    "quotes": ["error", "single", { "avoidEscape": true }],
+    "semi": ["error", "always"]
+  }
+}
