@@ -2,6 +2,7 @@ const config = require('../config');
 const state = require('../store/state');
 const { RichEmbed } = require('discord.js');
 const { getChannel } = require('../lib/channels');
+const { parseCommand } = require('../lib/prefix');
 const { handlePollSetup, handleAdminCommand, handleUtilityCommand } = require('../commands');
 
 function onMessage(client, msg) {
@@ -37,36 +38,8 @@ function onMessage(client, msg) {
 	}
 
 	let allowCommands = true;
-	let command = '',
-		messageBody = '';
 
-	if (msg.content.startsWith(`<@!${client.user.id}>`)) {
-		if (msg.content.includes(' ')) {
-			messageBody = msg.content.substr(msg.content.indexOf(' ') + 1);
-
-			if (messageBody.includes(' ')) {
-				command = messageBody.substr(messageBody.indexOf(' ') + 1).toLowerCase();
-			}
-			else {
-				command = messageBody;
-			}
-		}
-		else {
-			command = 'unsure';
-		}
-	}
-	else if (contentToLowerCase.startsWith('kod!') || contentToLowerCase.startsWith('kodama!')) {
-		if (msg.content.includes(' ')) {
-			const spaceIndex = msg.content.indexOf(' ');
-
-			command = contentToLowerCase.substring(msg.content.indexOf('!') + 1, spaceIndex);
-
-			messageBody = msg.content.substr(spaceIndex + 1);
-		}
-		else {
-			command = contentToLowerCase.substr(msg.content.indexOf('!') + 1);
-		}
-	}
+	const command = parseCommand(msg.content, client.user.id);
 
 	const isAdmin = member && member.roles.get(config.roles.admin);
 	const isMember = member && member.roles.get(config.roles.member);

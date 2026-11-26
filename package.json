@@ -15,7 +15,7 @@
   "author": "Naomi",
   "scripts": {
     "start": "node index.js",
-    "test": "node test/poll.test.js && node test/pollSetup.test.js && node test/lobby.test.js && node test/oauth.test.js",
+    "test": "node test/poll.test.js && node test/pollSetup.test.js && node test/lobby.test.js && node test/oauth.test.js && node test/prefix.test.js",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix"
   },

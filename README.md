@@ -163,6 +163,7 @@ lib/
   channels.js                Channel lookup by configured name or ID
   oauth.js                   OAuth redirect parsing
   paths.js                   Config, credential, and state locations
+  prefix.js                  Command prefix and mention parsing
   time.js                    Date and time formatting
 models/
   poll.js                    Poll, PollOption, PollSetupData, OptionEmoji
@@ -180,6 +181,7 @@ test/
   pollSetup.test.js          Guided poll setup state machine
   lobby.test.js              Lobby expiry
   oauth.test.js              OAuth redirect parsing
+  prefix.test.js             Command prefix and mention parsing
   fixtures/test-config.json  Test configuration
 Dockerfile                   Container image
 .dockerignore                Build context exclusions
@@ -322,7 +324,7 @@ npm start
 npm test
 ```
 
-The suite uses Node's built-in `assert` and runs each file in a separate process, so it adds no dependencies. It covers the poll model, the guided setup state machine, expired-poll closure, lobby expiry, and OAuth redirect parsing. Tests point `CONFIG_PATH` at a fixture and use a temporary `DATA_DIR`.
+The suite uses Node's built-in `assert` and runs each file in a separate process, so it adds no dependencies. It covers the poll model, the guided setup state machine, expired-poll closure, lobby expiry, OAuth redirect parsing, and command prefix parsing. Tests point `CONFIG_PATH` at a fixture and use a temporary `DATA_DIR`.
 
 The codebase is linted with ESLint, using the style the code is already written in (tabs, single quotes, Stroustrup braces, strict equality):
 
