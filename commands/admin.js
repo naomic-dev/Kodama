@@ -46,7 +46,7 @@ function handleAdminCommand(msg, member) {
 			embed = new RichEmbed()
 				.setColor(0x1abc9c)
 				.setTitle('New Poll Set Up')
-				.setDescription(`Creator: ${member}\n\nTitle:\nDescription:\nExpiration Date:\nOptions:\n\n**Select a title for your poll**`);
+				.setDescription(`Creator: ${member}\n\nTitle:\nDescription:\nExpiration Date:\nOptions:\n\n**Select a title for your poll**\n\nType \`[cancel]\` or \`!cancel\` at any time to stop.`);
 
 		setupChannel.send(embed)
 			.then((pollMessage) => {

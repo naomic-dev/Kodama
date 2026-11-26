@@ -6,6 +6,32 @@ const state = require('../store/state');
 const { Poll, PollSetupData } = require('../models/poll');
 const { schedulePollClosure } = require('../services/polls');
 
+const CANCEL_COMMANDS = ['[cancel]', '!cancel'];
+
+function cancelPollSetup(poll, member) {
+	state.unfinishedPollList = state.unfinishedPollList.filter(p => p.memberId !== member.id);
+
+	store.save('unfinishedPolls', state.unfinishedPollList);
+
+	const setupData = poll.setupData,
+		setupChannel = (setupData ? state.guild.channels.find(ch => ch.id === setupData.channelId) : null),
+		setupMessage = (setupChannel ? setupChannel.messages.find(m => m.id === setupData.messageId) : null);
+
+	log.info('Poll setup cancelled', { pollId: poll.id, memberId: member.id });
+
+	if (!setupMessage) {
+		return;
+	}
+
+	const embed = new RichEmbed()
+		.setColor(0xe91e63)
+		.setTitle('Poll Set Up Cancelled')
+		.setDescription(poll.getDescriptionForEmbed(state.guild));
+
+	setupMessage.edit(embed)
+		.catch(err => log.error('Failed to mark poll setup cancelled', { pollId: poll.id }, err));
+}
+
 function handlePollSetup(msg, member, contentToLowerCase) {
 	if (!member || !member.roles.get(config.roles.admin)) {
 		return false;
@@ -18,6 +44,12 @@ function handlePollSetup(msg, member, contentToLowerCase) {
 	}
 
 	Object.setPrototypeOf(poll, Poll.prototype);
+
+	if (CANCEL_COMMANDS.indexOf(contentToLowerCase) !== -1) {
+		cancelPollSetup(poll, member);
+
+		return true;
+	}
 
 	const pollListIndex = state.unfinishedPollList.findIndex(p => p.memberId === member.id),
 		embed = new RichEmbed()

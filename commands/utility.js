@@ -44,7 +44,8 @@ a @user
 **Start a poll (admins)**
 \`\`\`
 !poll [#channel]
-\`\`\``);
+\`\`\`
+Type \`[cancel]\` or \`!cancel\` to stop a poll setup.`);
 
 		channel.send(embed)
 			.catch(err => log.error('Failed to post help menu', { channel: 'botSpam' }, err));

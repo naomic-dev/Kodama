@@ -23,6 +23,7 @@ This repository is a **reference snapshot**. Server-specific IDs, channel names,
 ### Polls
 
 - Guided, stateful poll setup in an admin channel: title → description → duration → exclusive vs. multi-choice → options, each with an emoji.
+- `[cancel]` or `!cancel` abandons a setup at any step and marks the setup message as cancelled.
 - Options can use server custom emojis; single-choice polls automatically retract previous votes.
 - Polls close on schedule and post a final tally.
 - In-progress and open polls survive restarts (JSON-backed).

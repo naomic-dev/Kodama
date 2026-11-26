@@ -106,5 +106,34 @@ const admin = {
 		assert.deepStrictEqual(store.load('openPolls', []), []);
 	});
 
+	await test('[cancel] discards the poll and marks the setup message', () => {
+		const poll = new Poll('member-1', new PollSetupData('chan', 'msg'), 'chan', 'Lunch?');
+		state.unfinishedPollList = [poll];
+
+		const editsBefore = edits.length;
+
+		assert.strictEqual(handlePollSetup({ content: '[cancel]' }, admin, '[cancel]'), true);
+		assert.deepStrictEqual(state.unfinishedPollList, []);
+		assert.strictEqual(edits.length, editsBefore + 1);
+		assert.strictEqual(edits[edits.length - 1].title, 'Poll Set Up Cancelled');
+	});
+
+	await test('!cancel is accepted as an alias', () => {
+		const poll = new Poll('member-1', new PollSetupData('chan', 'msg'), 'chan');
+		poll.title = 'Lunch?';
+		state.unfinishedPollList = [poll];
+
+		assert.strictEqual(handlePollSetup({ content: '!cancel' }, admin, '!cancel'), true);
+		assert.deepStrictEqual(state.unfinishedPollList, []);
+	});
+
+	await test('cancelling before a title does not throw', () => {
+		const poll = new Poll('member-1', new PollSetupData('chan', 'msg'), 'chan');
+		state.unfinishedPollList = [poll];
+
+		assert.doesNotThrow(() => handlePollSetup({ content: '[cancel]' }, admin, '[cancel]'));
+		assert.deepStrictEqual(state.unfinishedPollList, []);
+	});
+
 	finish();
 })();
