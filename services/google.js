@@ -1,4 +1,7 @@
+const crypto = require('crypto');
 const fs = require('fs');
+const http = require('http');
+const path = require('path');
 const readline = require('readline');
 const { RichEmbed } = require('discord.js');
 const { google } = require('googleapis');
@@ -8,10 +11,12 @@ const paths = require('../lib/paths');
 const store = require('../store/jsonStore');
 const { getChannel } = require('../lib/channels');
 const { formatDateTime } = require('../lib/time');
+const { parseAuthorizationResponse } = require('../lib/oauth');
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 const CREDENTIALS_PATH = paths.googleCredentialsPath;
 const TOKEN_PATH = paths.googleTokenPath;
+const LOOPBACK_HOST = '127.0.0.1';
 
 const EVENT_IMAGE_KEYS = {
 	'main munch': 'mainMunch',
@@ -24,7 +29,114 @@ const EVENT_IMAGE_KEYS = {
 
 let oAuth2Client = null;
 
-function setGoogleApiAuth() {
+function sendBrowserMessage(res, status, title, message) {
+	res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' });
+	res.end(`<!doctype html><meta charset="utf-8"><title>${title}</title><h1>${title}</h1><p>${message}</p>`);
+}
+
+// Google blocked the out-of-band flow, so the authorization code comes back to
+// a loopback server on this machine. On a headless host the browser cannot
+// reach that server; the redirect URL in its address bar can be pasted instead.
+function runLoopbackFlow(client) {
+	return new Promise((resolve, reject) => {
+		const expectedState = crypto.randomBytes(16).toString('hex');
+		let redirectUri = null;
+		let readlineInterface = null;
+		let finished = false;
+
+		const server = http.createServer((req, res) => {
+			const requestUrl = new URL(req.url, `http://${LOOPBACK_HOST}`);
+			const error = requestUrl.searchParams.get('error');
+
+			if (error) {
+				sendBrowserMessage(res, 400, 'Authorization failed', `Google returned ${error}.`);
+				return fail(new Error(`Google authorization failed: ${error}`));
+			}
+
+			if (requestUrl.searchParams.get('state') !== expectedState) {
+				sendBrowserMessage(res, 400, 'Authorization failed', 'The state parameter did not match.');
+				return fail(new Error('Google authorization state did not match'));
+			}
+
+			sendBrowserMessage(res, 200, 'Kodama is authorized', 'You can close this tab and return to the terminal.');
+			succeed(requestUrl.searchParams.get('code'));
+		});
+
+		function finish() {
+			finished = true;
+			server.close();
+
+			if (readlineInterface) {
+				readlineInterface.close();
+			}
+		}
+
+		function fail(err) {
+			if (finished) {
+				return;
+			}
+
+			finish();
+			reject(err);
+		}
+
+		function succeed(code) {
+			if (finished) {
+				return;
+			}
+
+			if (!code) {
+				return fail(new Error('Google authorization response contained no code'));
+			}
+
+			finish();
+			resolve({ code: code, redirectUri: redirectUri });
+		}
+
+		server.on('error', fail);
+
+		server.listen(0, LOOPBACK_HOST, () => {
+			const port = server.address().port;
+			redirectUri = `http://${LOOPBACK_HOST}:${port}`;
+
+			const authUrl = client.generateAuthUrl({
+				access_type: 'offline',
+				prompt: 'consent',
+				scope: SCOPES,
+				redirect_uri: redirectUri,
+				state: expectedState
+			});
+
+			log.info('Authorize Kodama by visiting this URL', { url: authUrl });
+
+			if (!process.stdin.isTTY) {
+				log.info('Waiting for the OAuth redirect', { redirectUri: redirectUri });
+				return;
+			}
+
+			readlineInterface = readline.createInterface({ input: process.stdin, output: process.stdout });
+			readlineInterface.question('If the browser cannot reach this machine, paste the redirect URL or the code here: ', (answer) => {
+				const parsed = parseAuthorizationResponse(answer);
+
+				if (parsed.error) {
+					return fail(new Error(`Google authorization failed: ${parsed.error}`));
+				}
+
+				if (parsed.state && parsed.state !== expectedState) {
+					return fail(new Error('Google authorization state did not match'));
+				}
+
+				succeed(parsed.code);
+			});
+		});
+	});
+}
+
+function exchangeCode(client, code, redirectUri) {
+	return client.getTokenAsync({ code: code, redirect_uri: redirectUri });
+}
+
+async function setGoogleApiAuth() {
 	if (!fs.existsSync(CREDENTIALS_PATH)) {
 		throw new Error(
 			`Missing Google OAuth client credentials at ${CREDENTIALS_PATH}. ` +
@@ -32,46 +144,32 @@ function setGoogleApiAuth() {
 		);
 	}
 
-	const content = fs.readFileSync(CREDENTIALS_PATH);
-	const credentials = JSON.parse(content);
-	const { client_secret, client_id, redirect_uris } = credentials.installed;
-	oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+	const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
 
-	if (!fs.existsSync(TOKEN_PATH)) {
-		const authUrl = oAuth2Client.generateAuthUrl({
-			access_type: 'offline',
-			scope: SCOPES,
-		});
+	if (!credentials.installed) {
+		throw new Error(
+			`${CREDENTIALS_PATH} is not a Desktop app OAuth client. ` +
+			'Create an OAuth client of type "Desktop app" in Google Cloud Console and download its JSON.'
+		);
+	}
 
-		log.info('Authorize this app by visiting this URL', { url: authUrl });
-		const rl = readline.createInterface({
-			input: process.stdin,
-			output: process.stdout,
-		});
+	oAuth2Client = new google.auth.OAuth2(credentials.installed.client_id, credentials.installed.client_secret);
 
-		rl.question('Enter the code from that page here: ', (code) => {
-			rl.close();
-
-			oAuth2Client.getToken(code, (err, token) => {
-				if (err) return log.error('Failed to retrieve Google access token', err);
-
-				oAuth2Client.setCredentials(token);
-
-				// Store the token to disk for later program executions
-				fs.writeFile(TOKEN_PATH, JSON.stringify(token), (err) => {
-					if (err) return log.error('Failed to store Google token', { path: TOKEN_PATH }, err);
-
-					log.info('Google token stored', { path: TOKEN_PATH });
-				});
-			});
-		});
+	if (fs.existsSync(TOKEN_PATH)) {
+		oAuth2Client.setCredentials(JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf8')));
 
 		return;
 	}
 
-	const token = fs.readFileSync(TOKEN_PATH);
+	const authorization = await runLoopbackFlow(oAuth2Client);
+	const tokenResponse = await exchangeCode(oAuth2Client, authorization.code, authorization.redirectUri);
+	const token = tokenResponse.tokens;
 
-	oAuth2Client.setCredentials(JSON.parse(token));
+	oAuth2Client.setCredentials(token);
+	fs.mkdirSync(path.dirname(TOKEN_PATH), { recursive: true });
+	fs.writeFileSync(TOKEN_PATH, JSON.stringify(token));
+
+	log.info('Google token stored', { path: TOKEN_PATH });
 }
 
 function getAuth() {

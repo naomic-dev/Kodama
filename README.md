@@ -161,6 +161,7 @@ events/
   reactions.js               Poll votes, lobby reactions, raw packets
 lib/
   channels.js                Channel lookup by configured name or ID
+  oauth.js                   OAuth redirect parsing
   paths.js                   Config, credential, and state locations
   time.js                    Date and time formatting
 models/
@@ -178,6 +179,7 @@ test/
   poll.test.js               Poll model
   pollSetup.test.js          Guided poll setup state machine
   lobby.test.js              Lobby expiry
+  oauth.test.js              OAuth redirect parsing
   fixtures/test-config.json  Test configuration
 Dockerfile                   Container image
 .dockerignore                Build context exclusions
@@ -248,10 +250,24 @@ In Google Cloud Console, enable the Calendar API, create an OAuth client of type
 ```bash
 cp google_credentials.example.json ~/.config/kodama/google_credentials.json
 chmod 600 ~/.config/kodama/google_credentials.json
-# then paste in your client_id, client_secret, and project_id
+# then paste in your client_id and client_secret
 ```
 
-On first run Kodama prints an authorization URL. Visit it, paste the code back into the terminal, and it writes `~/.config/kodama/token.json` for subsequent runs.
+A Desktop-app client file from Google contains more than Kodama reads:
+
+| Field | Used | Notes |
+| --- | --- | --- |
+| `installed` | Yes | The wrapper key. Its presence confirms the client is type **Desktop app**; a Web application client has `web` instead and is rejected at startup. |
+| `client_id`, `client_secret` | Yes | The only values passed to the OAuth client. |
+| `redirect_uris` | No | Kodama listens on a random loopback port and sends that URI to Google directly, so the registered URIs — including the retired `urn:ietf:wg:oauth:2.0:oob` — are never used. |
+| `project_id` | No | Informational; identifies the Cloud project for other tooling. |
+| `auth_uri` | No | `googleapis` builds the authorization URL from its own fixed endpoint. |
+| `token_uri` | No | The token exchange likewise uses Google's fixed token endpoint. |
+| `auth_provider_x509_cert_url` | No | Certificate endpoint used by other Google client libraries, not by Kodama. |
+
+Nothing needs deleting. Paste in the two values, leave the rest as downloaded, and the file remains usable by other Google tooling; any keys a newer download adds are ignored the same way.
+
+On first run Kodama prints an authorization URL and waits. Open it and approve access; Google redirects the browser to a loopback server on the same machine, Kodama exchanges the code, and writes `~/.config/kodama/token.json` for subsequent runs. If the browser runs on a different machine (a headless Pi, or the container), the redirect page cannot load there — copy the full URL from the address bar and paste it at the terminal prompt instead.
 
 ### 4. Configure the environment
 
@@ -306,7 +322,7 @@ npm start
 npm test
 ```
 
-The suite uses Node's built-in `assert` and runs each file in a separate process, so it adds no dependencies. It covers the poll model, the guided setup state machine, expired-poll closure, and lobby expiry. Tests point `CONFIG_PATH` at a fixture and use a temporary `DATA_DIR`.
+The suite uses Node's built-in `assert` and runs each file in a separate process, so it adds no dependencies. It covers the poll model, the guided setup state machine, expired-poll closure, lobby expiry, and OAuth redirect parsing. Tests point `CONFIG_PATH` at a fixture and use a temporary `DATA_DIR`.
 
 The codebase is linted with ESLint, using the style the code is already written in (tabs, single quotes, Stroustrup braces, strict equality):
 
@@ -353,6 +369,8 @@ Run once interactively to complete the Google OAuth flow and write `~/.config/ko
 docker run --rm -it -v "$HOME/.config/kodama:/app/runtime" kodama
 ```
 
+The loopback listener lives inside the container, so the browser redirect will not load on the host; copy the URL from the browser's address bar and paste it at the prompt.
+
 Then start it detached:
 
 ```bash
@@ -396,7 +414,7 @@ Kodama originally ran 24/7 on a Raspberry Pi. The example unit is [`deploy/kodam
    ```bash
    sudo -u kodama sh -c 'cd /var/lib/kodama && KODAMA_HOME=/var/lib/kodama DATA_DIR=/var/lib/kodama/data node /opt/kodama/index.js'
    ```
-   Visit the printed URL, paste the code back, then press Ctrl+C once `token.json` has been written.
+   Open the printed URL on a machine with a browser. The redirect page cannot load there, so copy the full URL from the address bar and paste it at the prompt. Press Ctrl+C once `token.json` has been written.
 
 5. Install and start the unit:
    ```bash
