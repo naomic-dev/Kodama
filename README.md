@@ -265,7 +265,6 @@ chmod 600 ~/.config/kodama/.env
 | `BOT_TOKEN` | Discord bot token. |
 | `KODAMA_HOME` | Directory holding `config.json`, `.env`, `google_credentials.json`, and `token.json`. Defaults to `~/.config/kodama`. |
 | `CONFIG_PATH`, `ENV_FILE`, `GOOGLE_CREDENTIALS_PATH`, `GOOGLE_TOKEN_PATH` | Optional overrides for one file, for deployments that do not keep them together. |
-| `DEV` | `true` to use a separate development state directory (`<DATA_DIR>/dev`). |
 | `DATA_DIR` | Where runtime JSON state is stored. Defaults to `~/.local/share/kodama`. |
 | `LOG_LEVEL` | Minimum level to log: `error`, `warn`, `info`, or `debug`. Defaults to `info`. |
 | `LOG_FORMAT` | `text` for human-readable lines or `json` for one object per line. Defaults to `text`. |

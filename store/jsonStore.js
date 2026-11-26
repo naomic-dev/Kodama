@@ -11,8 +11,7 @@ const FILES = {
 	announcedEvents: 'announced events.json'
 };
 
-const dataDir = paths.dataDir;
-const folderRoot = (process.env.DEV === 'true' ? path.join(dataDir, 'dev') : dataDir);
+const folderRoot = paths.dataDir;
 
 fs.mkdirSync(folderRoot, { recursive: true });
 

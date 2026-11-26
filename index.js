@@ -13,7 +13,6 @@ const { onMessageReactionAdd, onMessageReactionRemove, onRaw } = require('./even
 const discordClient = new Client();
 
 log.info('Starting Kodama', {
-	dev: process.env.DEV === 'true',
 	dataDirectory: store.folderRoot
 });
 
