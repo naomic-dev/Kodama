@@ -7,6 +7,24 @@ const { Poll, PollSetupData } = require('../models/poll');
 const { schedulePollClosure } = require('../services/polls');
 
 const CANCEL_COMMANDS = ['[cancel]', '!cancel'];
+const POLL_COMMAND = '!poll';
+
+function notifySetupInProgress(poll) {
+	const setupData = poll.setupData,
+		setupChannel = (setupData ? state.guild.channels.find(ch => ch.id === setupData.channelId) : null);
+
+	if (!setupChannel) {
+		return;
+	}
+
+	const embed = new RichEmbed()
+		.setColor(0xe91e63)
+		.setTitle('Poll Setup Already In Progress')
+		.setDescription('Finish this poll with `[done]`, or type `[cancel]` to stop it.');
+
+	setupChannel.send(embed)
+		.catch(err => log.error('Failed to post poll setup notice', { pollId: poll.id }, err));
+}
 
 function cancelPollSetup(poll, member) {
 	state.unfinishedPollList = state.unfinishedPollList.filter(p => p.memberId !== member.id);
@@ -47,6 +65,12 @@ function handlePollSetup(msg, member, contentToLowerCase) {
 
 	if (CANCEL_COMMANDS.indexOf(contentToLowerCase) !== -1) {
 		cancelPollSetup(poll, member);
+
+		return true;
+	}
+
+	if (contentToLowerCase.startsWith(POLL_COMMAND)) {
+		notifySetupInProgress(poll);
 
 		return true;
 	}

@@ -135,5 +135,30 @@ const admin = {
 		assert.deepStrictEqual(state.unfinishedPollList, []);
 	});
 
+	await test('!poll during a setup is refused and leaves it untouched', () => {
+		const poll = new Poll('member-1', new PollSetupData('chan', 'msg'), 'chan', 'Lunch?');
+		state.unfinishedPollList = [poll];
+		sent.length = 0;
+
+		assert.strictEqual(handlePollSetup({ content: '!poll #polls' }, admin, '!poll #polls'), true);
+
+		assert.strictEqual(poll.title, 'Lunch?');
+		assert.strictEqual(state.unfinishedPollList.length, 1);
+		assert.strictEqual(sent.length, 1);
+		assert.strictEqual(sent[0].title, 'Poll Setup Already In Progress');
+	});
+
+	await test('the duplicate guard also applies before a title is set', () => {
+		const poll = new Poll('member-1', new PollSetupData('chan', 'msg'), 'chan');
+		state.unfinishedPollList = [poll];
+		sent.length = 0;
+
+		assert.strictEqual(handlePollSetup({ content: '!poll' }, admin, '!poll'), true);
+
+		assert.strictEqual(poll.title, null);
+		assert.strictEqual(state.unfinishedPollList.length, 1);
+		assert.strictEqual(sent.length, 1);
+	});
+
 	finish();
 })();
