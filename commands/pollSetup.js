@@ -26,28 +26,39 @@ function notifySetupInProgress(poll) {
 		.catch(err => log.error('Failed to post poll setup notice', { pollId: poll.id }, err));
 }
 
-function cancelPollSetup(poll, member) {
+function cancelPollSetup(poll, member, msg) {
 	state.unfinishedPollList = state.unfinishedPollList.filter(p => p.memberId !== member.id);
 
 	store.save('unfinishedPolls', state.unfinishedPollList);
 
 	const setupData = poll.setupData,
 		setupChannel = (setupData ? state.guild.channels.find(ch => ch.id === setupData.channelId) : null),
-		setupMessage = (setupChannel ? setupChannel.messages.find(m => m.id === setupData.messageId) : null);
+		setupMessage = (setupChannel ? setupChannel.messages.find(m => m.id === setupData.messageId) : null),
+		invokedChannel = (msg && msg.channel ? msg.channel : null);
 
 	log.info('Poll setup cancelled', { pollId: poll.id, memberId: member.id });
 
-	if (!setupMessage) {
+	if (setupMessage) {
+		const embed = new RichEmbed()
+			.setColor(0xe91e63)
+			.setTitle('Poll Set Up Cancelled')
+			.setDescription(poll.getDescriptionForEmbed(state.guild));
+
+		setupMessage.edit(embed)
+			.catch(err => log.error('Failed to mark poll setup cancelled', { pollId: poll.id }, err));
+	}
+
+	if (!invokedChannel || (setupMessage && invokedChannel.id === setupData.channelId)) {
 		return;
 	}
 
-	const embed = new RichEmbed()
+	const notice = new RichEmbed()
 		.setColor(0xe91e63)
-		.setTitle('Poll Set Up Cancelled')
-		.setDescription(poll.getDescriptionForEmbed(state.guild));
+		.setTitle('Poll Setup Cancelled')
+		.setDescription('No poll was created. Start another one with `!poll`.');
 
-	setupMessage.edit(embed)
-		.catch(err => log.error('Failed to mark poll setup cancelled', { pollId: poll.id }, err));
+	invokedChannel.send(notice)
+		.catch(err => log.error('Failed to confirm poll cancellation', { pollId: poll.id }, err));
 }
 
 function handlePollSetup(msg, member, contentToLowerCase) {
@@ -64,7 +75,7 @@ function handlePollSetup(msg, member, contentToLowerCase) {
 	Object.setPrototypeOf(poll, Poll.prototype);
 
 	if (CANCEL_COMMANDS.indexOf(contentToLowerCase) !== -1) {
-		cancelPollSetup(poll, member);
+		cancelPollSetup(poll, member, msg);
 
 		return true;
 	}

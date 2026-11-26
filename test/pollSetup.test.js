@@ -26,6 +26,13 @@ const channel = {
 		return Promise.resolve({ id: 'new-msg', react: async () => {} });
 	}
 };
+const otherChannel = {
+	id: 'other',
+	send: (embed) => {
+		sent.push(embed);
+		return Promise.resolve();
+	}
+};
 
 state.guild = {
 	channels: {
@@ -132,6 +139,29 @@ const admin = {
 		state.unfinishedPollList = [poll];
 
 		assert.doesNotThrow(() => handlePollSetup({ content: '[cancel]' }, admin, '[cancel]'));
+		assert.deepStrictEqual(state.unfinishedPollList, []);
+	});
+
+	await test('cancelling from another channel confirms there', () => {
+		const poll = new Poll('member-1', new PollSetupData('chan', 'msg'), 'chan', 'Lunch?');
+		state.unfinishedPollList = [poll];
+		sent.length = 0;
+
+		assert.strictEqual(handlePollSetup({ content: '[cancel]', channel: otherChannel }, admin, '[cancel]'), true);
+
+		assert.strictEqual(sent.length, 1);
+		assert.strictEqual(sent[0].title, 'Poll Setup Cancelled');
+		assert.deepStrictEqual(state.unfinishedPollList, []);
+	});
+
+	await test('cancelling in the setup channel only edits the setup message', () => {
+		const poll = new Poll('member-1', new PollSetupData('chan', 'msg'), 'chan', 'Lunch?');
+		state.unfinishedPollList = [poll];
+		sent.length = 0;
+
+		assert.strictEqual(handlePollSetup({ content: '!cancel', channel: channel }, admin, '!cancel'), true);
+
+		assert.strictEqual(sent.length, 0);
 		assert.deepStrictEqual(state.unfinishedPollList, []);
 	});
 
