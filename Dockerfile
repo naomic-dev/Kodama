@@ -15,7 +15,7 @@ USER node
 WORKDIR /app/runtime
 
 ENV NODE_ENV=production
-ENV CONFIG_PATH=/app/runtime/config.json
+ENV KODAMA_HOME=/app/runtime
 ENV DATA_DIR=/app/runtime/data
 
 CMD ["node", "/app/index.js"]

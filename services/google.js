@@ -4,12 +4,14 @@ const { RichEmbed } = require('discord.js');
 const { google } = require('googleapis');
 const config = require('../config');
 const log = require('../logger');
+const paths = require('../lib/paths');
 const store = require('../store/jsonStore');
 const { getChannel } = require('../lib/channels');
 const { formatDateTime } = require('../lib/time');
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
-const TOKEN_PATH = 'token.json';
+const CREDENTIALS_PATH = paths.googleCredentialsPath;
+const TOKEN_PATH = paths.googleTokenPath;
 
 const EVENT_IMAGE_KEYS = {
 	'main munch': 'mainMunch',
@@ -23,13 +25,14 @@ const EVENT_IMAGE_KEYS = {
 let oAuth2Client = null;
 
 function setGoogleApiAuth() {
-	if (!fs.existsSync('google_credentials.json')) {
+	if (!fs.existsSync(CREDENTIALS_PATH)) {
 		throw new Error(
-			'Missing google_credentials.json. Copy google_credentials.example.json and add your Google OAuth client credentials.'
+			`Missing Google OAuth client credentials at ${CREDENTIALS_PATH}. ` +
+			'Copy google_credentials.example.json there and add your client_id and client_secret.'
 		);
 	}
 
-	const content = fs.readFileSync('google_credentials.json');
+	const content = fs.readFileSync(CREDENTIALS_PATH);
 	const credentials = JSON.parse(content);
 	const { client_secret, client_id, redirect_uris } = credentials.installed;
 	oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);

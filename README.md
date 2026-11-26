@@ -9,7 +9,7 @@
 
 Kodama was the resident admin bot for a community Discord server. It ran 24/7 on a Raspberry Pi at home while the server was active, handling the server's front door: welcoming new members, verifying them out of a lobby, announcing events from a shared Google Calendar, and running polls for community decisions.
 
-This repository is a **reference snapshot**. Server-specific IDs, channel names, and calendar details live in `config.json`; the values in the repository are placeholders, so it will not run until you supply your own configuration. See [Setup](#setup).
+This repository is a **reference snapshot**. Server-specific IDs, channel names, and calendar details live in `config.json` outside the checkout; the example file holds placeholders, so it will not run until you supply your own configuration. See [Setup](#setup).
 
 ## Features
 
@@ -161,6 +161,7 @@ events/
   reactions.js               Poll votes, lobby reactions, raw packets
 lib/
   channels.js                Channel lookup by configured name or ID
+  paths.js                   Config, credential, and state locations
   time.js                    Date and time formatting
 models/
   poll.js                    Poll, PollOption, PollSetupData, OptionEmoji
@@ -182,17 +183,24 @@ Dockerfile                   Container image
 .dockerignore                Build context exclusions
 deploy/kodama.service        Raspberry Pi systemd unit
 .github/workflows/ci.yml     Tests (Node 12/14) and lint (Node 14)
-config.json                  Server IDs, roles, channels, calendar (not committed)
-.env                         Bot token and environment flags (not committed)
-google_credentials.json      Google OAuth client (not committed)
-token.json                   Google OAuth token, generated on first run (not committed)
-data/                        Runtime JSON state (not committed)
-  lobby.json                 Pending members and expiry dates
-  open polls.json            Live polls and vote state
-  unfinished polls.json      In-progress poll setup sessions
-  announced events.json      Event IDs already announced
-  kicked.json                Members removed by the lobby job
 ```
+
+Nothing in that tree is secret or writable. Configuration, credentials, and state live outside the checkout:
+
+```
+~/.config/kodama/config.json              Server IDs, roles, channels, calendar
+~/.config/kodama/.env                     Bot token and environment flags
+~/.config/kodama/google_credentials.json  Google OAuth client
+~/.config/kodama/token.json               Google OAuth token, created on first run
+~/.local/share/kodama/                    Runtime JSON state
+  lobby.json                              Pending members and expiry dates
+  open polls.json                         Live polls and vote state
+  unfinished polls.json                   In-progress poll setup sessions
+  announced events.json                   Event IDs already announced
+  kicked.json                             Members removed by the lobby job
+```
+
+`lib/paths.js` resolves those locations from `KODAMA_HOME` (default `~/.config/kodama`) and `DATA_DIR` (default `~/.local/share/kodama`), with per-file overrides for deployments.
 
 Major pieces:
 
@@ -214,6 +222,15 @@ Major pieces:
 
 ## Setup
 
+Local configuration and credentials live outside the repository, in `~/.config/kodama` by default. Create it with owner-only permissions before continuing:
+
+```bash
+mkdir -p ~/.config/kodama
+chmod 700 ~/.config/kodama
+```
+
+Every step below writes there. Set `KODAMA_HOME` to use a different directory.
+
 ### 1. Install dependencies
 
 ```bash
@@ -226,36 +243,41 @@ Create an application at <https://discord.com/developers/applications>, add a bo
 
 ### 3. Create Google credentials
 
-In Google Cloud Console, enable the Calendar API, create an OAuth client of type **Desktop app**, and download the JSON. Save it as `google_credentials.json`:
+In Google Cloud Console, enable the Calendar API, create an OAuth client of type **Desktop app**, and download the JSON. Save it as `google_credentials.json` in `~/.config/kodama`:
 
 ```bash
-cp google_credentials.example.json google_credentials.json
+cp google_credentials.example.json ~/.config/kodama/google_credentials.json
+chmod 600 ~/.config/kodama/google_credentials.json
 # then paste in your client_id, client_secret, and project_id
 ```
 
-On first run Kodama prints an authorization URL. Visit it, paste the code back into the terminal, and it writes `token.json` for subsequent runs.
+On first run Kodama prints an authorization URL. Visit it, paste the code back into the terminal, and it writes `~/.config/kodama/token.json` for subsequent runs.
 
 ### 4. Configure the environment
 
 ```bash
-cp .env.example .env
+cp .env.example ~/.config/kodama/.env
+chmod 600 ~/.config/kodama/.env
 ```
 
 | Variable | Description |
 | --- | --- |
 | `BOT_TOKEN` | Discord bot token. |
+| `KODAMA_HOME` | Directory holding `config.json`, `.env`, `google_credentials.json`, and `token.json`. Defaults to `~/.config/kodama`. |
+| `CONFIG_PATH`, `ENV_FILE`, `GOOGLE_CREDENTIALS_PATH`, `GOOGLE_TOKEN_PATH` | Optional overrides for one file, for deployments that do not keep them together. |
 | `DEV` | `true` to use a separate development state directory (`<DATA_DIR>/dev`). |
-| `DATA_DIR` | Where runtime JSON state is stored. Defaults to `./data`. |
+| `DATA_DIR` | Where runtime JSON state is stored. Defaults to `~/.local/share/kodama`. |
 | `LOG_LEVEL` | Minimum level to log: `error`, `warn`, `info`, or `debug`. Defaults to `info`. |
 | `LOG_FORMAT` | `text` for human-readable lines or `json` for one object per line. Defaults to `text`. |
 
 ### 5. Configure the server
 
 ```bash
-cp config.example.json config.json
+cp config.example.json ~/.config/kodama/config.json
+chmod 600 ~/.config/kodama/config.json
 ```
 
-`config.json` is git-ignored. Kodama refuses to start until the required values are filled in and lists anything that is missing.
+Kodama refuses to start until the required values are filled in and lists anything that is missing.
 
 | Key | Description |
 | --- | --- |
@@ -300,7 +322,7 @@ CI runs `npm run lint` on Node 14 as a separate job, failing on any warning or e
 
 ### Docker
 
-The image keeps the application code read-only and runs from `/app/runtime`, where the runtime files and state are mounted.
+The image keeps the application code read-only and runs from `/app/runtime`, where `KODAMA_HOME` points.
 
 Build it:
 
@@ -308,39 +330,41 @@ Build it:
 docker build -t kodama .
 ```
 
-Create a runtime directory and fill in the configuration:
+Create the host directory the container reads from, and fill in the configuration:
 
 ```bash
-mkdir -p runtime/data
-cp config.example.json runtime/config.json
-cp google_credentials.example.json runtime/google_credentials.json
-printf 'BOT_TOKEN=your-bot-token-here\n' > runtime/.env
-# edit runtime/config.json and runtime/google_credentials.json
+mkdir -p ~/.config/kodama
+chmod 700 ~/.config/kodama
+cp config.example.json ~/.config/kodama/config.json
+cp google_credentials.example.json ~/.config/kodama/google_credentials.json
+printf 'BOT_TOKEN=your-bot-token-here\n' > ~/.config/kodama/.env
+chmod 600 ~/.config/kodama/config.json ~/.config/kodama/google_credentials.json ~/.config/kodama/.env
+# edit the two JSON files
 ```
 
-The container runs as uid 1000, so make the runtime directory writable by that user if your host uid differs:
+The container runs as uid 1000 and writes `token.json` and `data/` into that directory, so make it writable by that user if your host uid differs:
 
 ```bash
-sudo chown -R 1000:1000 runtime
+sudo chown -R 1000:1000 ~/.config/kodama
 ```
 
-Run once interactively to complete the Google OAuth flow and write `runtime/token.json`:
+Run once interactively to complete the Google OAuth flow and write `~/.config/kodama/token.json`:
 
 ```bash
-docker run --rm -it -v "$PWD/runtime:/app/runtime" kodama
+docker run --rm -it -v "$HOME/.config/kodama:/app/runtime" kodama
 ```
 
 Then start it detached:
 
 ```bash
 docker run -d --name kodama --restart unless-stopped \
-  -v "$PWD/runtime:/app/runtime" \
+  -v "$HOME/.config/kodama:/app/runtime" \
   kodama
 
 docker logs -f kodama
 ```
 
-`config.json`, `google_credentials.json`, `token.json`, and `.env` are read from `/app/runtime`; state is written to `/app/runtime/data`.
+`KODAMA_HOME` is `/app/runtime` inside the container, so `config.json`, `google_credentials.json`, `token.json`, and `.env` are read from the mounted directory; state is written to `/app/runtime/data`, which is `~/.config/kodama/data` on the host.
 
 ### Raspberry Pi (systemd)
 
@@ -360,17 +384,18 @@ Kodama originally ran 24/7 on a Raspberry Pi. The example unit is [`deploy/kodam
 
 3. Create the runtime directory and copy the templates:
    ```bash
-   sudo install -d -o kodama -g kodama /var/lib/kodama
+   sudo install -d -o kodama -g kodama -m 700 /var/lib/kodama
    sudo -u kodama cp /opt/kodama/config.example.json /var/lib/kodama/config.json
    sudo -u kodama cp /opt/kodama/google_credentials.example.json /var/lib/kodama/google_credentials.json
    sudo -u kodama sh -c 'printf "BOT_TOKEN=your-bot-token-here\n" > /var/lib/kodama/.env'
+   sudo chmod 600 /var/lib/kodama/config.json /var/lib/kodama/google_credentials.json /var/lib/kodama/.env
    sudo -u kodama "${EDITOR:-vi}" /var/lib/kodama/config.json
    sudo -u kodama "${EDITOR:-vi}" /var/lib/kodama/google_credentials.json
    ```
 
 4. Complete the Google OAuth flow once in the foreground. If the service is already running, stop it first.
    ```bash
-   sudo -u kodama sh -c 'cd /var/lib/kodama && CONFIG_PATH=/var/lib/kodama/config.json DATA_DIR=/var/lib/kodama/data node /opt/kodama/index.js'
+   sudo -u kodama sh -c 'cd /var/lib/kodama && KODAMA_HOME=/var/lib/kodama DATA_DIR=/var/lib/kodama/data node /opt/kodama/index.js'
    ```
    Visit the printed URL, paste the code back, then press Ctrl+C once `token.json` has been written.
 
@@ -382,7 +407,7 @@ Kodama originally ran 24/7 on a Raspberry Pi. The example unit is [`deploy/kodam
    sudo journalctl -u kodama -f
    ```
 
-The unit reads `.env` from `/var/lib/kodama/.env`, expects `config.json` and the Google credentials in `/var/lib/kodama`, and writes state to `/var/lib/kodama/data`. If Node is installed via nvm rather than the system package manager, replace `/usr/bin/env node` in the unit with the absolute path to your Node binary.
+The unit sets `KODAMA_HOME=/var/lib/kodama` and `DATA_DIR=/var/lib/kodama/data`, reads `.env` from `/var/lib/kodama/.env`, expects `config.json` and the Google credentials in `/var/lib/kodama`, and writes state to `/var/lib/kodama/data`. If Node is installed via nvm rather than the system package manager, replace `/usr/bin/env node` in the unit with the absolute path to your Node binary.
 
 Set `LOG_FORMAT=json` in `.env` to emit one JSON object per line for journald.
 

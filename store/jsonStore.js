@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const log = require('../logger');
+const paths = require('../lib/paths');
 
 const FILES = {
 	lobby: 'lobby.json',
@@ -10,7 +11,7 @@ const FILES = {
 	announcedEvents: 'announced events.json'
 };
 
-const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+const dataDir = paths.dataDir;
 const folderRoot = (process.env.DEV === 'true' ? path.join(dataDir, 'dev') : dataDir);
 
 fs.mkdirSync(folderRoot, { recursive: true });

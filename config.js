@@ -1,8 +1,8 @@
 const fs = require('fs');
-const path = require('path');
 const log = require('./logger');
+const paths = require('./lib/paths');
 
-const CONFIG_PATH = process.env.CONFIG_PATH || path.join(__dirname, 'config.json');
+const CONFIG_PATH = paths.configPath;
 
 const DEFAULTS = {
 	guildId: '',
@@ -80,7 +80,7 @@ function load() {
 		fileConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 	}
 	else {
-		log.warn('No config.json found; using defaults. Copy config.example.json to config.json and fill it in.');
+		log.warn('No configuration file found; using defaults', { path: CONFIG_PATH });
 	}
 
 	return merge(DEFAULTS, fileConfig);
@@ -100,7 +100,7 @@ function validate(settings) {
 	if (missing.length > 0) {
 		throw new Error(
 			`Missing configuration values: ${missing.join(', ')}. ` +
-			'Copy config.example.json to config.json and fill them in.'
+			`Copy config.example.json to ${CONFIG_PATH} and fill them in.`
 		);
 	}
 

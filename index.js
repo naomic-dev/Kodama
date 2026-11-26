@@ -1,4 +1,6 @@
-require('dotenv').config();
+const paths = require('./lib/paths');
+
+require('dotenv').config({ path: paths.envPath });
 require('./config');
 const { Client } = require('discord.js');
 const log = require('./logger');

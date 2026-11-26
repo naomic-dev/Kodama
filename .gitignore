@@ -5,6 +5,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Environment
+# Kodama reads these from ~/.config/kodama, outside the checkout. The patterns
+# stay as a safety net so a stray local copy is never committed.
 .env
 .env.*
 !.env.example
@@ -17,6 +19,7 @@ token.json
 
 # Runtime state
 data/
+runtime/
 *.log
 
 # Local configuration
