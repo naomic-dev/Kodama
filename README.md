@@ -426,7 +426,6 @@ This is a faithful snapshot, not a maintained product. If I picked it up again:
 - [ ] Replace JSON persistence with SQLite and transaction-safe writes.
 - [ ] Add Prettier once the code moves to `discord.js` v14.
 - [ ] Add screenshots and a short recording to replace the text demo.
-- [ ] Add screenshots and a short recording to replace the text demo.
 
 ## License
 
